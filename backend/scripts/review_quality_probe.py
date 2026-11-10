@@ -36,6 +36,8 @@ CASES: list[tuple[str, str]] = [
     ("divide, no context", "def divide(a, b):\n    return a / b\n"),
     (
         "hardcoded credential (security)",
+        # Synthetic test input — NOT a real secret. A fake key the probe feeds the model to
+        # check whether it flags a hardcoded credential.
         'API_KEY = "sk-live-abc123"\n\n\ndef call():\n    return API_KEY\n',
     ),
     ("clean conventional function", "def add(a, b):\n    return a + b\n"),

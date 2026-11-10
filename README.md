@@ -52,7 +52,8 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:5173 — it should show **"✓ Backend OK · provider: ollama"**.
+Then open http://localhost:5173 — it should show **"✓ Backend OK · provider: ollama"** (or
+**`provider: mock`** when you run the backend with `LLM_PROVIDER=mock`).
 
 ## Configuration
 
