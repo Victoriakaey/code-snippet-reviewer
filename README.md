@@ -4,10 +4,10 @@ A lightweight, self-service tool for AI-powered review of ad-hoc code snippets.
 Submit a snippet, trigger an LLM review, and work through the structured findings —
 accept, dismiss, or discuss each one.
 
-> **Status:** backend M1–M4 + frontend core (M5) + **per-finding discussion (M6)**. The full
-> journey works in the browser: dashboard → create a snippet (CodeMirror) → run a review →
-> inspect findings (severity-marked code, finding↔line nav) → accept/dismiss/reopen with a
-> reason → discuss a finding with the AI. Final integration/docs (M7) remain.
+The full journey works in the browser: dashboard → create a snippet (CodeMirror) → run a
+review → inspect findings (severity-marked code, finding↔line navigation) → accept / dismiss /
+reopen with a reason → discuss a finding with the AI. See [`AI_USAGE.md`](./AI_USAGE.md) for an
+honest account of how AI was used to build it.
 
 ## Stack
 
@@ -26,6 +26,13 @@ docker compose up --build
 
 - Frontend: http://localhost:5173
 - Backend health: http://localhost:8000/api/health
+
+**Ollama from inside Docker:** a container's `localhost` is the container, **not** your host,
+so the backend cannot reach a host-installed Ollama via `localhost:11434`. The compose file
+points the backend at the host with `OLLAMA_BASE_URL=http://host.docker.internal:11434`
+(resolved on Linux by an `extra_hosts: host-gateway` entry). Start Ollama on the host first
+(`ollama serve` + `ollama pull <model>`). **No Ollama?** Run the app end-to-end in Docker with
+deterministic placeholder findings by setting `LLM_PROVIDER=mock` for the backend service.
 
 ### Option B — without Docker (lighter on memory)
 
@@ -64,21 +71,11 @@ Copy `backend/.env.example` to `backend/.env` and adjust. Key variables:
 > No Ollama installed? Set `LLM_PROVIDER=mock` to run the app end-to-end with deterministic
 > placeholder findings. Real AI review requires a local model via Ollama.
 
-### Trying the review provider (M2)
+> **Optional:** `backend/scripts/ollama_smoke.py` reviews three sample snippets against a
+> running Ollama and prints findings, latency, and validation outcomes — a quick check that a
+> local model responds in the expected shape (shape only, never semantic correctness).
 
-The review pipeline is wired into an HTTP endpoint only in M3. To sanity-check a real model
-now, run the smoke script against a running Ollama:
-
-```bash
-cd backend
-OLLAMA_MODEL=<your-local-tag> .venv/bin/python scripts/ollama_smoke.py
-```
-
-It reviews three snippets and prints findings, latency, and validation outcomes. A
-structurally valid response proves the output is well-formed and in-range — never that a
-finding is semantically correct.
-
-## API (current)
+## API
 
 - `POST /api/snippets` — create a snippet (`title`, `language`, `code`) → `201`. Validation
   failures (empty title/code, unsupported language, oversized input) → `422`.
@@ -127,6 +124,69 @@ cd backend && pytest -q
 
 ## Architecture & decisions
 
-Design rationale, data model, API contracts, and trade-offs are documented and will be
-summarized here as the milestones land. (Internal planning notes live outside the
-submission.)
+**Shape.** React/TypeScript/Vite frontend → FastAPI backend → SQLite (SQLAlchemy). A review is
+not run in the request: `POST /reviews` only inserts a `queued` row and returns `202`; a single
+in-process **background worker** claims it (`queued → running`), calls the model, validates the
+output, and writes findings + the terminal status in **one transaction**. The frontend polls
+`GET /reviews/{id}` (~1.5s) until a terminal state. Discussion is the opposite shape — a single
+quick model call awaited in the request (it does not need the job machinery).
+
+**Key decisions and trade-offs:**
+
+- **Ollama-first, explicit provider, no auto-fallback.** `LLM_PROVIDER` selects the provider;
+  choosing local never silently sends code to a cloud service (privacy), and a fixed provider
+  keeps a run reproducible — every review stores the actual `provider` + `model_name`, shown in
+  the UI. A `mock` provider gives deterministic, model-free runs for tests and demos.
+- **The model proposes; it never writes the DB or runs code.** Output is validated before any
+  write: bad JSON or all-invalid findings → the review `failed`; an individual invalid finding
+  is **dropped and counted** (shown as "N filtered"), never clamped — forcing an out-of-range
+  line would fabricate false evidence. Evidence shown in the UI is the *actual* snippet lines,
+  derived from the immutable snippet, so the model cannot invent code. **Valid structure is not
+  semantic truth** — the app never claims a finding is correct, only well-formed and in-range.
+- **Immutable snippets.** A snippet has no `updated_at`; a finding's line range always refers to
+  the exact code it was generated against, never shifted lines.
+- **One active review per snippet, enforced by the database** (a partial unique index on
+  `status IN ('queued','running')`), not by an application check — two concurrent enqueues can
+  never both win.
+- **Single-process worker + startup recovery.** On boot, `running` reviews (interrupted by a
+  crash) are marked `failed`; `queued` ones are preserved. This assumes a single API process —
+  running multiple workers would break recovery.
+- **Discussion persistence is atomic.** The user question and the AI answer are saved together
+  or not at all; a model/DB failure saves nothing and returns a retryable `503`. Older reviews'
+  findings and discussions are read-only (resolutions and new messages are blocked with `409`).
+- **Schema migration without Alembic (deliberate minimal stand-in).** `create_all()` builds
+  missing tables; a tiny `ensure_schema()` adds missing additive columns on startup and fails
+  loudly rather than running on a broken schema.
+
+### Known limitations
+
+- **Discussion is atomic but not exactly-once** under ambiguous network failures (a reply could
+  be generated but the response lost); retrying is safe but may re-ask the model.
+- **Grounding / premise-checking is not guaranteed.** The 7B model can still partly go along
+  with a false premise in a question; the v2 discussion prompt reduces this but does not remove
+  it.
+- **The 20-message discussion history cap does not strictly bound total context size** — a few
+  very long messages can still be large.
+- **Dashboard `GET /api/snippets` is N+1** (a few queries per row) and two components
+  (`SnippetDetail`, `DiscussionView`) carry more complexity than ideal — known tech debt.
+- **No UI to reach an older review's findings/discussions.** Once a newer review succeeds, prior
+  runs stay in the database but are not navigable in the UI. A read-only run-history entry point
+  is a **post-MVP roadmap item** (it touches the read-only invariants, so it was not bundled
+  into delivery).
+- **Hybrid static-analysis + LLM review is deferred** — reviews are LLM-only.
+- **Local-model reality:** quality and latency depend on the chosen Ollama model; a review and a
+  discussion can contend for the model. There is no scheduler — both have timeouts and the UI
+  shows honest waiting/error states.
+
+### What I'd change for production
+
+Manage schema with **Alembic** (not startup `ensure_schema`); add a **readiness** probe that
+actually pings SQLite + the provider (today's `/api/health` is liveness-only); and if more than
+one backend instance were ever needed, move review jobs to a **durable queue** with leases
+instead of the single-process worker.
+
+---
+
+*This README and [`AI_USAGE.md`](./AI_USAGE.md) are self-contained — everything a reviewer needs
+is in the tracked repository. Internal planning notes are intentionally not part of the
+submission.*

@@ -5,8 +5,14 @@ services:
       - "8000:8000"
     environment:
       - LLM_PROVIDER=ollama
+      # A container's localhost is the container, not the host. Reach a host-installed Ollama
+      # via host.docker.internal (Docker Desktop resolves it; the extra_hosts entry below adds
+      # it on Linux). Set LLM_PROVIDER=mock to run without Ollama.
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
       # Absolute path inside the container; the named volume persists the SQLite file.
       - DATABASE_URL=sqlite:////app/data/app.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - backend_data:/app/data
 
