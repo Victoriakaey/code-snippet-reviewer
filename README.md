@@ -90,7 +90,8 @@ Copy `backend/.env.example` to `backend/.env` and adjust. Key variables:
 `ollama` (real local model, no cloud account), or `openai` (real cloud model, needs an API key).
 
 > No Ollama installed? Set `LLM_PROVIDER=mock` to run the app end-to-end with deterministic
-> placeholder findings. Real AI review requires a local model via Ollama.
+> placeholder findings. Real AI review requires either a locally installed Ollama model or a
+> configured OpenAI API key.
 
 ### Using OpenAI (`gpt-5-mini`) — real cloud reviews
 
