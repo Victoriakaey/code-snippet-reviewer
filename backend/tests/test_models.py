@@ -190,7 +190,7 @@ def test_message_role_check(db: Session):
 )
 def test_derive_status_maps_latest_review(db: Session, latest_status, expected):
     """Derived dashboard status follows the snippet's latest review by run_number."""
-    from app.routers.snippets import _derive_status
+    from app.routers.snippets import _derive_status, _latest_review
 
     s = _snippet(db)
     if latest_status is not None:
@@ -198,7 +198,7 @@ def test_derive_status_maps_latest_review(db: Session, latest_status, expected):
         db.add(_review(s.id, 1, "completed"))
         db.add(_review(s.id, 2, latest_status))
         db.commit()
-    assert _derive_status(db, s.id) == expected
+    assert _derive_status(_latest_review(db, s.id)) == expected
 
 
 def test_finding_resolution_defaults_open(db: Session):
