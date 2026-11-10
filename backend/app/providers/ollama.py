@@ -13,7 +13,12 @@ from __future__ import annotations
 
 import httpx
 
-from ..rubric import FINDINGS_SCHEMA, SYSTEM_PROMPT, build_user_prompt
+from ..rubric import (
+    FINDINGS_SCHEMA,
+    SYSTEM_PROMPT,
+    build_discuss_prompt,
+    build_user_prompt,
+)
 from .base import ProviderError, ReviewProvider
 
 
@@ -34,18 +39,15 @@ class OllamaProvider(ReviewProvider):
         # httpx.MockTransport without a live server. Production leaves it None.
         self._transport = transport
 
-    async def review(self, *, code: str, language: str) -> str:
-        payload = {
+    async def _chat(self, messages: list[dict], fmt: dict | None = None) -> str:
+        payload: dict = {
             "model": self.model_name,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": build_user_prompt(code, language)},
-            ],
-            "format": FINDINGS_SCHEMA,
+            "messages": messages,
             "stream": False,
-            # Low temperature for more reproducible structured output.
             "options": {"temperature": 0},
         }
+        if fmt is not None:
+            payload["format"] = fmt
         try:
             async with httpx.AsyncClient(
                 timeout=self.timeout, transport=self._transport
@@ -62,7 +64,23 @@ class OllamaProvider(ReviewProvider):
             )
 
         try:
-            body = response.json()
-            return body["message"]["content"]
+            return response.json()["message"]["content"]
         except (ValueError, KeyError, TypeError) as exc:
             raise ProviderError(f"unexpected Ollama response shape: {exc}") from exc
+
+    async def review(self, *, code: str, language: str) -> str:
+        return await self._chat(
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": build_user_prompt(code, language)},
+            ],
+            fmt=FINDINGS_SCHEMA,
+        )
+
+    async def discuss(
+        self, *, code: str, language: str, finding: dict, history: list[dict], question: str
+    ) -> str:
+        # Free-text answer (no structured-output schema).
+        return await self._chat(
+            build_discuss_prompt(code, language, finding, history, question)
+        )

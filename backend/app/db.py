@@ -66,6 +66,33 @@ def get_db():
         db.close()
 
 
+# Additive columns that create_all() cannot retrofit onto an ALREADY-EXISTING table
+# (create_all only creates missing tables, never alters existing ones). Kept tiny and
+# additive on purpose — no Alembic for this MVP.
+_REQUIRED_COLUMNS: dict[str, dict[str, str]] = {
+    "finding_messages": {"provider": "VARCHAR", "model_name": "VARCHAR"},
+}
+
+
+def ensure_schema(bind=engine) -> None:
+    """Idempotent, additive column migration. For each known table that already exists, add
+    any missing nullable column. Raises on a database error — it must NEVER swallow a failure
+    and continue, or the app would run with a schema that is missing columns and fail at
+    request time. Run AFTER create_all() (which handles a fresh DB's tables).
+    """
+    with bind.begin() as conn:
+        for table, columns in _REQUIRED_COLUMNS.items():
+            info = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+            if not info:
+                continue  # table doesn't exist yet; create_all() builds it with the columns
+            existing = {row[1] for row in info}
+            for column, coltype in columns.items():
+                if column not in existing:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"
+                    )
+
+
 @contextmanager
 def session_scope() -> Iterator[Session]:
     """A transactional Session scope for code outside a request (e.g. the M3 worker).

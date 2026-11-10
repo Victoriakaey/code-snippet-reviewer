@@ -8,12 +8,9 @@ the implementation, not exposed here).
 Note: a review call is NOT a pure function — model output, latency, and network state all
 vary. Only the downstream validation (`app.review_pipeline`) is pure.
 
-Reserved for M6 (not implemented here, to avoid an unused placeholder): a `discuss()` method
-with the intended contract
-    async def discuss(*, code: str, language: str, finding: dict,
-                      history: list[dict], question: str) -> str
-— one quick, timeout-bounded LLM call answering a follow-up about a specific finding. It is
-intentionally absent from this interface until M6 builds it.
+`discuss()` (M6) answers a follow-up question grounded in ONE finding — one quick,
+timeout-bounded LLM call. Like `review()` it returns raw model text and raises ProviderError
+if the call fails.
 """
 from __future__ import annotations
 
@@ -40,4 +37,20 @@ class ReviewProvider(ABC):
     async def review(self, *, code: str, language: str) -> str:
         """Return the model's RAW text output (expected to be JSON). Raise ProviderError
         if the call itself fails. Does NOT validate — that is the pipeline's job."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def discuss(
+        self,
+        *,
+        code: str,
+        language: str,
+        finding: dict,
+        history: list[dict],
+        question: str,
+    ) -> str:
+        """Answer a follow-up question grounded in ONE finding. `finding` carries its line
+        range, severity, category, description, rationale and suggested_fix; `history` is the
+        prior thread as [{role, content}]. Returns the assistant's text; raises ProviderError
+        if the call fails."""
         raise NotImplementedError

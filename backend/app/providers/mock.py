@@ -82,3 +82,14 @@ class MockProvider(ReviewProvider):
         # would hide the very case the validator exists to catch. The findings above are
         # already in range by construction (line 1, or a matched line index).
         return json.dumps({"findings": findings})
+
+    async def discuss(
+        self, *, code: str, language: str, finding: dict, history: list[dict], question: str
+    ) -> str:
+        # Deterministic canned reply that echoes the finding — not a real answer.
+        return (
+            f"(mock discussion) Regarding the {finding.get('severity')} "
+            f"{finding.get('category')} finding on lines {finding.get('line_start')}-"
+            f"{finding.get('line_end')}: this is a deterministic mock reply, not real "
+            f"analysis. You asked: {question.strip()}"
+        )

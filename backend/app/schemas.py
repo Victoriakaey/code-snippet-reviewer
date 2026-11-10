@@ -181,6 +181,39 @@ class SnippetDetail(BaseModel):
     findings: list[FindingRead] = []
 
 
+QUESTION_MAX = 2000
+
+
+class DiscussRequest(BaseModel):
+    """POST body for a finding discussion message."""
+
+    question: str
+
+    @field_validator("question")
+    @classmethod
+    def _non_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("question must not be empty")
+        if len(v) > QUESTION_MAX:
+            raise ValueError(f"question must be at most {QUESTION_MAX} characters")
+        return v
+
+
+class MessageRead(BaseModel):
+    """One message in a finding's discussion thread. `provider`/`model_name` are set on
+    ASSISTANT messages (which model answered) and null on user messages."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    role: str
+    content: str
+    provider: str | None
+    model_name: str | None
+    created_at: datetime
+
+
 class RubricDimension(BaseModel):
     category: str
     description: str

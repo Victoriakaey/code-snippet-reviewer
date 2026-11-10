@@ -172,6 +172,11 @@ class FindingMessage(Base):
     )
     role: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Provenance of an ASSISTANT message — which model actually answered. NULL on user
+    # messages. Lets the UI show "answered by X" and never imply the review model and the
+    # discuss model are the same when they differ.
+    provider: Mapped[str | None] = mapped_column(String, nullable=True)
+    model_name: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=_utcnow)
 
     finding: Mapped["Finding"] = relationship(back_populates="messages")

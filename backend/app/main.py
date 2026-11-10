@@ -13,9 +13,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import models  # noqa: F401 — registers ORM tables on Base before create_all.
 from .config import settings
-from .db import Base, engine
+from .db import Base, engine, ensure_schema
 from .errors import install_error_handlers
-from .routers import findings, reviews, rubric, snippets
+from .routers import findings, messages, reviews, rubric, snippets
 from .worker import recover_interrupted_reviews, worker_loop
 
 logger = logging.getLogger("app")
@@ -23,8 +23,11 @@ logger = logging.getLogger("app")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Create any missing tables on startup (idempotent; no schema migration).
+    # Create any missing tables on startup, then apply the additive column migration for any
+    # pre-existing table (create_all does not alter existing tables). ensure_schema raises on
+    # failure rather than starting with a missing column.
     Base.metadata.create_all(bind=engine)
+    ensure_schema(engine)
     # Startup recovery: fail any review left `running` by a previous crash (queued ones are
     # preserved). Single-process assumption — see app/worker.py.
     recovered = await asyncio.to_thread(recover_interrupted_reviews)
@@ -54,6 +57,7 @@ install_error_handlers(app)
 app.include_router(snippets.router)
 app.include_router(reviews.router)
 app.include_router(findings.router)
+app.include_router(messages.router)
 app.include_router(rubric.router)
 
 # The Vite dev server (and its preview server) call the API from a different origin.
