@@ -77,8 +77,9 @@ Copy `backend/.env.example` to `backend/.env` and adjust. Key variables:
   - `openai` — a real **cloud** model via the OpenAI API (set `OPENAI_API_KEY`).
   - `mock` — a deterministic stand-in that needs no model; it exercises the full app flow
     but produces placeholder findings, **not** a real review.
-- `OLLAMA_BASE_URL`, `OLLAMA_MODEL` — local model. Install Ollama and pull a code model,
-  e.g. `ollama pull qwen2.5-coder:7b` (any local tag works; set `OLLAMA_MODEL` to match).
+- `OLLAMA_BASE_URL`, `OLLAMA_MODEL` — local model. **The model is not bundled with this
+  repository** — install Ollama and pull a code model locally, e.g. `ollama pull qwen2.5-coder:7b`
+  (any local tag works; set `OLLAMA_MODEL` to match).
 - `OPENAI_API_KEY`, `OPENAI_MODEL` — for the OpenAI provider. The key is read **only** from the
   environment / the gitignored `.env`, never hardcoded. `OPENAI_MODEL` defaults to `gpt-5-mini`;
   `OPENAI_REASONING_EFFORT` (minimal|low|medium|high) and `OPENAI_MAX_OUTPUT_TOKENS` are optional
@@ -251,6 +252,19 @@ Manage schema with **Alembic** (not startup `ensure_schema`); add a **readiness*
 actually pings SQLite + the provider (today's `/api/health` is liveness-only); and if more than
 one backend instance were ever needed, move review jobs to a **durable queue** with leases
 instead of the single-process worker.
+
+Two larger directions I'd pursue next:
+
+- **Hybrid deterministic + LLM review.** Run language-specific **static analysis** (linters,
+  type checkers) first, then normalize and deduplicate its findings against the LLM's. This
+  grounds the checkable findings in verifiable, reproducible evidence and cuts the LLM's
+  false positives on clean code. It does **not** eliminate semantic mistakes — the LLM half
+  stays non-deterministic — but it anchors the part that *can* be checked. Today the review is
+  **LLM-only; this hybrid path is not yet built.**
+- **Security hardening.** Add authentication/authorization, rate limiting, and request/resource
+  limits, plus proper sandbox isolation before ever running or executing untrusted code. Note
+  the app **does not execute submitted snippets today** — it only sends their text to the model —
+  so this is hardening for a real multi-tenant deployment, not closing a current sandbox gap.
 
 ---
 

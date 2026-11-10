@@ -135,7 +135,7 @@ X" from "X was verified to actually hold."
 
 **Did AI make this faster?** Clearly yes on the mechanical bulk: scaffolding the FastAPI routers
 and SQLAlchemy models, wiring the polling hook, and writing the first pass of each test suite
-were far quicker than by hand. The backend's 132 tests and the typed API surface came together
+were far quicker than by hand. The backend's test suite and the typed API surface came together
 fast, and the model was genuinely good at the "boring but fiddly" work — enum CHECK constraints,
 the partial unique index, error-envelope plumbing.
 
