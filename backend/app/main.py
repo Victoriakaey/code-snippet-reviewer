@@ -25,5 +25,10 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health() -> dict:
-    """Liveness probe. Reports the configured LLM provider (no secrets)."""
+    """Liveness probe ONLY: confirms the API process is up and can respond.
+
+    It intentionally does NOT touch SQLite or Ollama, so a 200 here is not proof that
+    the database or the model are reachable. A separate readiness check (pinging the DB
+    and the configured provider) can be added later if deployment needs it.
+    """
     return {"status": "ok", "llm_provider": settings.llm_provider}

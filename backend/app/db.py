@@ -4,12 +4,20 @@ SQLite with two pragmas enabled on every connection:
 - foreign_keys=ON  — SQLite ignores FK constraints unless this is set per-connection.
 - journal_mode=WAL — better read/write concurrency for our single-process worker + API.
 
+Session rule (important): a SQLAlchemy Session is NOT thread-safe and must never be
+shared across threads. `check_same_thread=False` only lets the DBAPI *connection* be
+used from another thread — it does not make a Session safe to share. So:
+- each API request gets its own Session via the `get_db` dependency;
+- the background review worker (M3) must open its OWN Session per job via `session_scope`
+  (or `SessionLocal()`), never reuse a request's Session.
+
 Models/tables are added in M1; this module only owns the connection + session factory.
 """
 import os
+from contextlib import contextmanager
 
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
 
@@ -45,9 +53,27 @@ class Base(DeclarativeBase):
 
 
 def get_db():
-    """FastAPI dependency: yields a session and always closes it."""
+    """FastAPI dependency: yields a NEW Session per request and always closes it."""
     db = SessionLocal()
     try:
         yield db
+    finally:
+        db.close()
+
+
+@contextmanager
+def session_scope() -> Session:
+    """A transactional Session scope for code outside a request (e.g. the M3 worker).
+
+    Each call opens its own Session — the worker must use this (or SessionLocal())
+    per job, never a Session borrowed from another thread/request.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
