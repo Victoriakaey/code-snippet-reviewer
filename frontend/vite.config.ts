@@ -1,0 +1,18 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+// The dev server proxies /api to the backend so the frontend can use same-origin
+// relative URLs. In docker-compose VITE_API_TARGET points at the backend service.
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: true,
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: process.env.VITE_API_TARGET || "http://localhost:8000",
+        changeOrigin: true,
+      },
+    },
+  },
+});

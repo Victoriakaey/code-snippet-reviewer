@@ -1,0 +1,24 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_PROVIDER=ollama
+      # Absolute path inside the container; the named volume persists the SQLite file.
+      - DATABASE_URL=sqlite:////app/data/app.db
+    volumes:
+      - backend_data:/app/data
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      # The Vite dev proxy forwards /api to the backend service on the compose network.
+      - VITE_API_TARGET=http://backend:8000
+    depends_on:
+      - backend
+
+volumes:
+  backend_data:
