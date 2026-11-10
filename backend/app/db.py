@@ -43,6 +43,10 @@ def _set_sqlite_pragmas(dbapi_connection, _connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.execute("PRAGMA journal_mode=WAL")
+    # Wait (up to 5s) for a lock instead of failing immediately with SQLITE_BUSY, so a
+    # concurrent writer (e.g. two review enqueues, or the worker vs a request) blocks
+    # briefly rather than erroring. The unique/partial indexes still arbitrate correctness.
+    cursor.execute("PRAGMA busy_timeout=5000")
     cursor.close()
 
 
