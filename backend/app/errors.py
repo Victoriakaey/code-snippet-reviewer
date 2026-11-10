@@ -6,10 +6,16 @@ kept to validation text / explicit HTTPException details — never raw exception
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from .providers.base import ProviderError
+
+logger = logging.getLogger(__name__)
 
 _CODE_BY_STATUS = {
     400: "bad_request",
@@ -51,4 +57,17 @@ def install_error_handlers(app: FastAPI) -> None:
                     "message": _summarize_validation(exc.errors()),
                 }
             },
+        )
+
+    @app.exception_handler(ProviderError)
+    async def _provider_error_handler(_request: Request, exc: ProviderError):
+        """The configured LLM provider cannot be used (e.g. `LLM_PROVIDER=openai` with no
+        `OPENAI_API_KEY`). This is a server-side deployment-configuration problem, not a bad
+        request — 503 in the shared envelope, so no request produces an unhandled 500. The
+        ProviderError messages are author-written config hints (an env-var NAME at most, never
+        a value or a stack trace); the full error is logged server-side for the operator."""
+        logger.warning("provider unavailable: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"error": {"code": "provider_unavailable", "message": str(exc)}},
         )
