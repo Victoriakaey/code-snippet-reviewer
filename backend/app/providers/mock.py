@@ -19,7 +19,6 @@ class MockProvider(ReviewProvider):
 
     async def review(self, *, code: str, language: str) -> str:
         lines = code.splitlines()
-        line_count = max(len(lines), 1)
         findings: list[dict] = []
 
         # Deterministic pattern rules (line numbers kept in range).
@@ -77,9 +76,9 @@ class MockProvider(ReviewProvider):
             }
         )
 
-        # Keep every line reference within the snippet.
-        for f in findings:
-            f["line_start"] = min(f["line_start"], line_count)
-            f["line_end"] = min(f["line_end"], line_count)
-
+        # NOTE: we deliberately do NOT clamp line numbers here. The validation pipeline's
+        # contract is that out-of-range lines are rejected, never clamped (clamping would
+        # fabricate evidence). A provider must not silently sanitize its own output, or it
+        # would hide the very case the validator exists to catch. The findings above are
+        # already in range by construction (line 1, or a matched line index).
         return json.dumps({"findings": findings})
