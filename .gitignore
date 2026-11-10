@@ -3,6 +3,7 @@ docs/
 
 # Session continuity / planning (not for the submission repo)
 RESUME.md
+RESUME-archive.md
 
 # Tooling
 .siltpoke/
@@ -27,8 +28,10 @@ dist/
 !.env.example
 *.local
 
-# Database
+# Database (incl. SQLite WAL-mode sidecar files)
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 
 # OS / editor
