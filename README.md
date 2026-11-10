@@ -28,12 +28,24 @@ docker compose up --build
 - Frontend: http://localhost:5173
 - Backend health: http://localhost:8000/api/health
 
-**Ollama from inside Docker:** a container's `localhost` is the container, **not** your host,
-so the backend cannot reach a host-installed Ollama via `localhost:11434`. The compose file
-points the backend at the host with `OLLAMA_BASE_URL=http://host.docker.internal:11434`
-(resolved on Linux by an `extra_hosts: host-gateway` entry). Start Ollama on the host first
-(`ollama serve` + `ollama pull <model>`). **No Ollama?** Run the app end-to-end in Docker with
-deterministic placeholder findings by setting `LLM_PROVIDER=mock` for the backend service.
+Out of the box this runs in **mock (demo) mode** — no Ollama, no API key needed. You can create
+a snippet and run the complete flow (review → findings → accept/dismiss → discuss → history)
+immediately. Mock findings are **deterministic placeholders, shown with a "simulated — not real
+AI" banner in the UI** — they are not a real model's analysis.
+
+**For a real AI review**, pick a provider on the command line:
+
+```bash
+# Real LOCAL model — start Ollama on the host first: `ollama serve` + `ollama pull qwen2.5-coder:7b`
+LLM_PROVIDER=ollama docker compose up --build
+
+# Real CLOUD model — needs an OpenAI API key
+LLM_PROVIDER=openai OPENAI_API_KEY=sk-... docker compose up --build
+```
+
+**Ollama from inside Docker:** a container's `localhost` is the container, **not** your host, so
+the backend reaches a host-installed Ollama through `OLLAMA_BASE_URL=http://host.docker.internal:11434`
+(the compose file sets this; Linux resolves it via an `extra_hosts: host-gateway` entry).
 
 ### Option B — without Docker (lighter on memory)
 

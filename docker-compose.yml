@@ -4,12 +4,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - LLM_PROVIDER=ollama
-      # A container's localhost is the container, not the host. Reach a host-installed Ollama
-      # via host.docker.internal (Docker Desktop resolves it; the extra_hosts entry below adds
-      # it on Linux). Set LLM_PROVIDER=mock to run without Ollama, or LLM_PROVIDER=openai with
-      # an OPENAI_API_KEY (passed through from your shell env below) to use the cloud provider.
+      # Defaults to `mock` so `docker compose up --build` runs the FULL demo workflow with no
+      # Ollama and no API key — mock findings are deterministic placeholders, labelled
+      # "simulated — not real AI" in the UI. Override for a real review:
+      #   LLM_PROVIDER=ollama docker compose up   (needs a host-installed Ollama; see below)
+      #   LLM_PROVIDER=openai OPENAI_API_KEY=sk-... docker compose up   (cloud provider)
+      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      # A container's localhost is the container, not the host. The ollama provider reaches a
+      # host-installed Ollama via host.docker.internal (Docker Desktop resolves it; the
+      # extra_hosts entry below adds it on Linux).
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5-coder:7b}
       # Forwarded from the host shell when set; never baked into the image. Only used when
       # LLM_PROVIDER=openai.
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
