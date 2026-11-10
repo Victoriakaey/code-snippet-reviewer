@@ -4,10 +4,10 @@ A lightweight, self-service tool for AI-powered review of ad-hoc code snippets.
 Submit a snippet, trigger an LLM review, and work through the structured findings —
 accept, dismiss, or discuss each one.
 
-> **Status:** data model + snippet CRUD (M1) + LLM review provider & validation pipeline
-> (M2) + async review worker (M3) + finding resolution (M4). Discuss and the UI land in
-> later milestones. The backend can create a snippet, trigger a review, poll it to
-> completion, and accept/dismiss its findings.
+> **Status:** backend through M4 + the **frontend core (M5)**. The full journey works in the
+> browser: dashboard → create a snippet (CodeMirror) → run a review → inspect findings
+> (severity-marked code, finding↔line nav) → accept/dismiss/reopen with a reason. Discuss
+> (M6) and final integration/docs (M7) remain.
 
 ## Stack
 
