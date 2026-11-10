@@ -4,10 +4,10 @@ A lightweight, self-service tool for AI-powered review of ad-hoc code snippets.
 Submit a snippet, trigger an LLM review, and work through the structured findings —
 accept, dismiss, or discuss each one.
 
-> **Status:** backend through M4 + the **frontend core (M5)**. The full journey works in the
-> browser: dashboard → create a snippet (CodeMirror) → run a review → inspect findings
-> (severity-marked code, finding↔line nav) → accept/dismiss/reopen with a reason. Discuss
-> (M6) and final integration/docs (M7) remain.
+> **Status:** backend M1–M4 + frontend core (M5) + **per-finding discussion (M6)**. The full
+> journey works in the browser: dashboard → create a snippet (CodeMirror) → run a review →
+> inspect findings (severity-marked code, finding↔line nav) → accept/dismiss/reopen with a
+> reason → discuss a finding with the AI. Final integration/docs (M7) remain.
 
 ## Stack
 
@@ -92,6 +92,10 @@ finding is semantically correct.
 - `PATCH /api/findings/{id}` — record a human decision on a finding: `open` / `accepted` /
   `dismissed` + an optional reason (≤ 1000 chars). Idempotent; only findings of a snippet's
   latest review are mutable (older runs are read-only → `409`); `404` for an unknown id.
+- `POST /api/findings/{id}/messages` — ask a finding-grounded question; the user + AI replies
+  are saved atomically (nothing is saved on failure → `503`); historical findings → `409`.
+- `GET /api/findings/{id}/messages` — the discussion thread (readable for any finding).
+- `GET /api/rubric` — the static versioned rubric.
 - `GET /api/health` — liveness only.
 
 Reviews run on a single in-process background worker (one at a time per the local-model
@@ -108,9 +112,12 @@ Four tables (`snippets`, `reviews`, `findings`, `finding_messages`). Enums and l
 are enforced as SQLite `CHECK` constraints; at most one active review per snippet is
 enforced by a partial unique index; foreign keys are enforced (`PRAGMA foreign_keys=ON`).
 
-Tables are created on startup with SQLAlchemy `create_all()`. **This does not migrate an
-existing schema** — it only creates missing tables. A production deployment would manage
-schema changes with a migration tool such as **Alembic** (intentionally out of scope here).
+Tables are created on startup with SQLAlchemy `create_all()`, which only creates missing
+tables (it does not alter existing ones). A tiny idempotent helper (`ensure_schema`) adds any
+missing **additive** columns to a pre-existing table on startup and fails loudly if it can't,
+so an older local database is upgraded without data loss. This is a deliberate minimal
+stand-in — a production deployment would manage schema changes with **Alembic** (out of
+scope here).
 
 ## Tests
 
