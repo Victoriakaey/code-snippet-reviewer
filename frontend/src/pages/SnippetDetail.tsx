@@ -170,42 +170,44 @@ export function SnippetDetail() {
         </section>
 
         <section className="workspace-panel findings-panel">
-          <div className="panel-head">
-            <strong>{discussingFinding ? "Discussion" : "Findings"}</strong>
-            {!discussingFinding && (
-              <span className="muted" style={{ fontSize: 13 }}>
-                {displayed && findings.length > 0 ? `${findings.length} shown` : ""}
-                {displayed && displayed.rejected_finding_count > 0
-                  ? ` · ${displayed.rejected_finding_count} filtered`
-                  : ""}
-              </span>
-            )}
-          </div>
-          <div className="panel-scroll">
-            {discussingFinding ? (
-              <DiscussionView
-                finding={discussingFinding}
-                readOnly={historical}
-                onBack={() => setDiscussingId(null)}
-              />
-            ) : !displayed ? (
-              <div className="empty">
-                {reviewActive ? "Review in progress…" : "Not reviewed yet. Run a review to see findings."}
+          {discussingFinding ? (
+            <DiscussionView
+              finding={discussingFinding}
+              readOnly={historical}
+              onBack={() => setDiscussingId(null)}
+            />
+          ) : (
+            <>
+              <div className="panel-head">
+                <strong>Findings</strong>
+                <span className="muted" style={{ fontSize: 13 }}>
+                  {displayed && findings.length > 0 ? `${findings.length} shown` : ""}
+                  {displayed && displayed.rejected_finding_count > 0
+                    ? ` · ${displayed.rejected_finding_count} filtered`
+                    : ""}
+                </span>
               </div>
-            ) : findings.length === 0 ? (
-              <div className="empty">No issues found in review #{displayed.run_number}.</div>
-            ) : (
-              <FindingsPanel
-                findings={findings}
-                codeLines={codeLines}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                readOnly={historical}
-                onResolved={onResolved}
-                onDiscuss={setDiscussingId}
-              />
-            )}
-          </div>
+              <div className="panel-scroll">
+                {!displayed ? (
+                  <div className="empty">
+                    {reviewActive ? "Review in progress…" : "Not reviewed yet. Run a review to see findings."}
+                  </div>
+                ) : findings.length === 0 ? (
+                  <div className="empty">No issues found in review #{displayed.run_number}.</div>
+                ) : (
+                  <FindingsPanel
+                    findings={findings}
+                    codeLines={codeLines}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                    readOnly={historical}
+                    onResolved={onResolved}
+                    onDiscuss={setDiscussingId}
+                  />
+                )}
+              </div>
+            </>
+          )}
         </section>
       </div>
 
