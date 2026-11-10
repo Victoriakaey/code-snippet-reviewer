@@ -4,6 +4,8 @@ Wiring: CORS for the Vite dev server, a liveness health endpoint, the snippet ro
 and the shared error envelope. Tables are created on startup via `create_all()` (MVP —
 this does NOT migrate an existing schema; production would use Alembic).
 """
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,20 +15,44 @@ from . import models  # noqa: F401 — registers ORM tables on Base before creat
 from .config import settings
 from .db import Base, engine
 from .errors import install_error_handlers
-from .routers import snippets
+from .routers import reviews, snippets
+from .worker import recover_interrupted_reviews, worker_loop
+
+logger = logging.getLogger("app")
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Create any missing tables on startup (idempotent; no schema migration).
     Base.metadata.create_all(bind=engine)
-    yield
+    # Startup recovery: fail any review left `running` by a previous crash (queued ones are
+    # preserved). Single-process assumption — see app/worker.py.
+    recovered = await asyncio.to_thread(recover_interrupted_reviews)
+    if recovered:
+        logger.info("startup recovery marked %d interrupted review(s) failed", recovered)
+
+    # Start the single background review worker.
+    stop_event = asyncio.Event()
+    task = asyncio.create_task(worker_loop(stop_event))
+    try:
+        yield
+    finally:
+        # Clean shutdown: ask the loop to stop, then cancel if it's mid-await (e.g. a live
+        # Ollama call). A review cancelled mid-run stays `running` and is recovered to
+        # `failed` on the next startup.
+        stop_event.set()
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="Code Snippet Reviewer API", version="0.1.0", lifespan=lifespan)
 
 install_error_handlers(app)
 app.include_router(snippets.router)
+app.include_router(reviews.router)
 
 # The Vite dev server (and its preview server) call the API from a different origin.
 app.add_middleware(

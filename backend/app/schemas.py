@@ -70,3 +70,44 @@ class SnippetRead(BaseModel):
     code: str
     created_at: datetime
     status: DerivedStatus
+
+
+class FindingRead(BaseModel):
+    """One finding in a completed review."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    line_start: int
+    line_end: int
+    severity: str
+    category: str
+    description: str
+    rationale: str | None
+    suggested_fix: str | None
+    resolution_status: str
+    resolution_reason: str | None
+    resolved_at: datetime | None
+
+
+class ReviewRead(BaseModel):
+    """A review's current state. Provenance (provider/model/versions) reflects what actually
+    ran this review, read from the stored row — never re-read from live settings. `findings`
+    is populated on a completed review; `error_message` on a failed one."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    snippet_id: str
+    run_number: int
+    status: str
+    provider: str | None
+    model_name: str | None
+    prompt_version: str | None
+    rubric_version: str | None
+    rejected_finding_count: int
+    error_message: str | None
+    created_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+    findings: list[FindingRead] = []
