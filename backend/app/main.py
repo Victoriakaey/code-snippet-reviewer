@@ -15,7 +15,7 @@ from . import models  # noqa: F401 — registers ORM tables on Base before creat
 from .config import settings
 from .db import Base, engine
 from .errors import install_error_handlers
-from .routers import reviews, snippets
+from .routers import findings, reviews, snippets
 from .worker import recover_interrupted_reviews, worker_loop
 
 logger = logging.getLogger("app")
@@ -53,6 +53,7 @@ app = FastAPI(title="Code Snippet Reviewer API", version="0.1.0", lifespan=lifes
 install_error_handlers(app)
 app.include_router(snippets.router)
 app.include_router(reviews.router)
+app.include_router(findings.router)
 
 # The Vite dev server (and its preview server) call the API from a different origin.
 app.add_middleware(

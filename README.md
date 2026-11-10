@@ -5,9 +5,9 @@ Submit a snippet, trigger an LLM review, and work through the structured finding
 accept, dismiss, or discuss each one.
 
 > **Status:** data model + snippet CRUD (M1) + LLM review provider & validation pipeline
-> (M2) + async review worker (M3). Finding resolution, discuss, and the UI land in later
-> milestones. The backend can now create a snippet, trigger a review, and poll it to
-> completion end-to-end.
+> (M2) + async review worker (M3) + finding resolution (M4). Discuss and the UI land in
+> later milestones. The backend can create a snippet, trigger a review, poll it to
+> completion, and accept/dismiss its findings.
 
 ## Stack
 
@@ -89,6 +89,9 @@ finding is semantically correct.
 - `GET /api/reviews/{id}` — poll a review: `queued` / `running` / `completed` (with findings)
   / `failed` (with a sanitized error). Provenance (provider, model, rubric/prompt version) is
   stored per review.
+- `PATCH /api/findings/{id}` — record a human decision on a finding: `open` / `accepted` /
+  `dismissed` + an optional reason (≤ 1000 chars). Idempotent; only findings of a snippet's
+  latest review are mutable (older runs are read-only → `409`); `404` for an unknown id.
 - `GET /api/health` — liveness only.
 
 Reviews run on a single in-process background worker (one at a time per the local-model

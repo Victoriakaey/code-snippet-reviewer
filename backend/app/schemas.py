@@ -90,6 +90,33 @@ class FindingRead(BaseModel):
     resolved_at: datetime | None
 
 
+RESOLUTION_REASON_MAX = 1000
+
+
+class FindingResolutionUpdate(BaseModel):
+    """PATCH body for resolving a finding. `resolution_reason` distinguishes three cases:
+    omitted (field absent) preserves the existing reason on a same-status edit; explicit
+    `null` clears it; a string replaces it. The handler reads `model_fields_set` to tell
+    omitted from an explicit null. Whitespace-only reasons normalize to null."""
+
+    resolution_status: Literal["open", "accepted", "dismissed"]
+    resolution_reason: str | None = None
+
+    @field_validator("resolution_reason")
+    @classmethod
+    def _normalize_reason(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        if len(v) > RESOLUTION_REASON_MAX:
+            raise ValueError(
+                f"resolution_reason must be at most {RESOLUTION_REASON_MAX} characters"
+            )
+        return v
+
+
 class ReviewRead(BaseModel):
     """A review's current state. Provenance (provider/model/versions) reflects what actually
     ran this review, read from the stored row — never re-read from live settings. `findings`
