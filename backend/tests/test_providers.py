@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 
+import httpx
 import pytest
 
 from app.config import Settings
@@ -12,6 +13,16 @@ from app.review_pipeline import validate_review_output
 
 def _run(coro):
     return asyncio.run(coro)
+
+
+def _ollama(handler) -> OllamaProvider:
+    """An OllamaProvider whose HTTP calls are served by a MockTransport handler."""
+    return OllamaProvider(
+        base_url="http://test",
+        model="test-model",
+        timeout=1.0,
+        transport=httpx.MockTransport(handler),
+    )
 
 
 # --- MockProvider ---------------------------------------------------------------
@@ -69,3 +80,62 @@ def test_factory_rejects_unknown_provider():
     cfg = Settings(llm_provider="banana")
     with pytest.raises(ProviderError, match="unknown"):
         get_provider(cfg)
+
+
+def test_factory_passes_configured_timeout():
+    cfg = Settings(llm_provider="ollama", ollama_timeout=7.5)
+    provider = get_provider(cfg)
+    assert isinstance(provider, OllamaProvider)
+    assert provider.timeout == 7.5
+
+
+# --- OllamaProvider error branches (driven by httpx.MockTransport, no live server) ---
+
+
+def test_ollama_success_returns_raw_content():
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"message": {"content": '{"findings": []}'}})
+
+    raw = _run(_ollama(handler).review(code="x = 1", language="python"))
+    assert raw == '{"findings": []}'
+
+
+def test_ollama_timeout_raises_provider_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow", request=request)
+
+    with pytest.raises(ProviderError, match="timed out"):
+        _run(_ollama(handler).review(code="x", language="python"))
+
+
+def test_ollama_connection_error_raises_provider_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    with pytest.raises(ProviderError, match="request failed"):
+        _run(_ollama(handler).review(code="x", language="python"))
+
+
+def test_ollama_non_200_raises_provider_error():
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="boom")
+
+    with pytest.raises(ProviderError, match="HTTP 500"):
+        _run(_ollama(handler).review(code="x", language="python"))
+
+
+def test_ollama_malformed_envelope_raises_provider_error():
+    # 200 OK but the response JSON lacks message.content.
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"unexpected": True})
+
+    with pytest.raises(ProviderError, match="unexpected Ollama response"):
+        _run(_ollama(handler).review(code="x", language="python"))
+
+
+def test_ollama_non_json_body_raises_provider_error():
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="not json")
+
+    with pytest.raises(ProviderError, match="unexpected Ollama response"):
+        _run(_ollama(handler).review(code="x", language="python"))
