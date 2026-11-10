@@ -9,6 +9,7 @@ import type {
   SnippetRow,
   ResolutionUpdate,
   Finding,
+  FindingMessage,
 } from "./types";
 
 export interface HealthResponse {
@@ -84,3 +85,12 @@ export const patchFinding = (id: string, body: ResolutionUpdate) =>
   request<Finding>(`/api/findings/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 
 export const getRubric = () => request<Rubric>("/api/rubric");
+
+export const getMessages = (findingId: string) =>
+  request<FindingMessage[]>(`/api/findings/${findingId}/messages`);
+
+export const postMessage = (findingId: string, question: string) =>
+  request<FindingMessage[]>(`/api/findings/${findingId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ question }),
+  });

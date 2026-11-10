@@ -11,6 +11,7 @@ interface Props {
   onSelect: (id: string) => void;
   readOnly: boolean;
   onResolved: (updated: Finding) => void;
+  onDiscuss: (findingId: string) => void;
 }
 
 export function FindingsPanel({
@@ -20,6 +21,7 @@ export function FindingsPanel({
   onSelect,
   readOnly,
   onResolved,
+  onDiscuss,
 }: Props) {
   if (findings.length === 0) {
     return <div className="empty">No findings in this review.</div>;
@@ -35,6 +37,7 @@ export function FindingsPanel({
           onSelect={() => onSelect(f.id)}
           readOnly={readOnly}
           onResolved={onResolved}
+          onDiscuss={() => onDiscuss(f.id)}
         />
       ))}
     </div>
@@ -55,9 +58,10 @@ interface ItemProps {
   onSelect: () => void;
   readOnly: boolean;
   onResolved: (updated: Finding) => void;
+  onDiscuss: () => void;
 }
 
-function FindingItem({ finding, codeLines, selected, onSelect, readOnly, onResolved }: ItemProps) {
+function FindingItem({ finding, codeLines, selected, onSelect, readOnly, onResolved, onDiscuss }: ItemProps) {
   const [reason, setReason] = useState(finding.resolution_reason ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +137,12 @@ function FindingItem({ finding, codeLines, selected, onSelect, readOnly, onResol
             )}
             {error && <div className="error-box" style={{ marginTop: 8 }}>{error}</div>}
           </section>
+
+          <div className="finding-actions">
+            <button className="sm ghost" onClick={onDiscuss}>
+              {readOnly ? "View discussion" : "Discuss this finding"}
+            </button>
+          </div>
         </div>
       )}
     </div>

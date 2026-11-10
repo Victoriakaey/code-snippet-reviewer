@@ -67,6 +67,15 @@ export interface SnippetDetail {
   findings: Finding[];
 }
 
+export interface FindingMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  provider: string | null;
+  model_name: string | null;
+  created_at: string;
+}
+
 export interface Rubric {
   name: string;
   rubric_version: string;

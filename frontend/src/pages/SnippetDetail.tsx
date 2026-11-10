@@ -6,6 +6,7 @@ import { useReviewPolling } from "../hooks/useReviewPolling";
 import type { Finding, Review, ReviewStatus, SnippetDetail as Detail } from "../types";
 import { CodeEditor } from "../components/CodeEditor";
 import { FindingsPanel } from "../components/FindingsPanel";
+import { DiscussionView } from "../components/DiscussionView";
 import { ReviewDetailsDrawer } from "../components/ReviewDetailsDrawer";
 import { LangBadge } from "../components/badges";
 import { isMockReviewer } from "../mock";
@@ -20,6 +21,7 @@ export function SnippetDetail() {
   const [triggeredReviewId, setTriggeredReviewId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [discussingId, setDiscussingId] = useState<string | null>(null);
 
   const loadDetail = useCallback(() => {
     getSnippet(id)
@@ -34,6 +36,7 @@ export function SnippetDetail() {
     setRunError(null);
     setTriggeredReviewId(null);
     setSelectedId(null);
+    setDiscussingId(null);
     loadDetail();
   }, [id, loadDetail]);
 
@@ -50,6 +53,7 @@ export function SnippetDetail() {
   const findings = detail?.findings ?? [];
   const codeLines = useMemo(() => (detail ? detail.code.split("\n") : []), [detail]);
   const selectedFinding = findings.find((f) => f.id === selectedId) ?? null;
+  const discussingFinding = findings.find((f) => f.id === discussingId) ?? null;
   const selectedRange = selectedFinding
     ? { start: selectedFinding.line_start, end: selectedFinding.line_end }
     : null;
@@ -167,16 +171,24 @@ export function SnippetDetail() {
 
         <section className="workspace-panel findings-panel">
           <div className="panel-head">
-            <strong>Findings</strong>
-            <span className="muted" style={{ fontSize: 13 }}>
-              {displayed && findings.length > 0 ? `${findings.length} shown` : ""}
-              {displayed && displayed.rejected_finding_count > 0
-                ? ` · ${displayed.rejected_finding_count} filtered`
-                : ""}
-            </span>
+            <strong>{discussingFinding ? "Discussion" : "Findings"}</strong>
+            {!discussingFinding && (
+              <span className="muted" style={{ fontSize: 13 }}>
+                {displayed && findings.length > 0 ? `${findings.length} shown` : ""}
+                {displayed && displayed.rejected_finding_count > 0
+                  ? ` · ${displayed.rejected_finding_count} filtered`
+                  : ""}
+              </span>
+            )}
           </div>
           <div className="panel-scroll">
-            {!displayed ? (
+            {discussingFinding ? (
+              <DiscussionView
+                finding={discussingFinding}
+                readOnly={historical}
+                onBack={() => setDiscussingId(null)}
+              />
+            ) : !displayed ? (
               <div className="empty">
                 {reviewActive ? "Review in progress…" : "Not reviewed yet. Run a review to see findings."}
               </div>
@@ -190,15 +202,9 @@ export function SnippetDetail() {
                 onSelect={setSelectedId}
                 readOnly={historical}
                 onResolved={onResolved}
+                onDiscuss={setDiscussingId}
               />
             )}
-          </div>
-
-          <div className="discussion-foot">
-            <span><strong>Discussion</strong> <span className="muted">· coming in M6</span></span>
-            <button className="sm" disabled title="Discuss lands in M6">
-              Discuss a finding
-            </button>
           </div>
         </section>
       </div>
