@@ -65,6 +65,11 @@ def client(session_factory: sessionmaker) -> Iterator[TestClient]:
 
     app.dependency_overrides[get_db] = _override
     try:
+        # Deliberately NOT `with TestClient(app)`: without the context manager the lifespan
+        # (and thus the background worker) does not run, so review-API tests see a stable
+        # `queued` state. Worker processing is covered separately in test_worker.py by
+        # driving worker.process_next() directly. If this is ever switched to a `with`
+        # block, the queued-state assertions in test_reviews_api.py can race the worker.
         yield TestClient(app)
     finally:
         app.dependency_overrides.clear()

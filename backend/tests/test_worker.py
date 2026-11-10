@@ -150,6 +150,25 @@ def test_all_invalid_fails(worker_scope, monkeypatch):
         assert r.error_message
 
 
+def test_unexpected_error_marks_failed_not_stuck_running(worker_scope, monkeypatch):
+    # A non-ProviderError after the claim (here: get_provider blows up) must still move the
+    # review out of `running`, or the snippet would be locked behind 409 until a restart.
+    sid = _seed_snippet(worker_scope)
+    rid = _enqueue(worker_scope, sid)
+
+    def boom(_settings=None):
+        raise RuntimeError("provider config exploded")
+
+    monkeypatch.setattr(worker, "get_provider", boom)
+    asyncio.run(worker.process_next())  # claims (running) then hits the error
+
+    with worker_scope() as db:
+        r = db.get(Review, rid)
+        assert r.status == "failed"  # not stuck running
+        assert r.findings == []
+        assert r.error_message
+
+
 def test_malformed_output_fails(worker_scope, monkeypatch):
     _use_provider(monkeypatch, FakeProvider(raw="not json at all"))
     sid = _seed_snippet(worker_scope)

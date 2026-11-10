@@ -236,23 +236,37 @@ def _mark_failed_fresh(review_id: str, message: str) -> None:
 
 
 async def process_claimed(review_id: str) -> None:
-    """Run the provider for an already-claimed (running) review and persist the outcome."""
-    data = await asyncio.to_thread(_load_review_input, review_id)
-    if data is None:
-        return
-    code, language, line_count = data
+    """Run the provider for an already-claimed (running) review and persist the outcome.
 
-    provider = get_provider(settings)
+    The review is `running` on entry, so this MUST drive it to a terminal state no matter
+    what. ProviderError becomes a clean failed result; any OTHER unexpected error (a broken
+    provider config, an HTTP error the provider didn't wrap, a DB error while loading) is
+    caught here and the review is marked failed in a fresh session. A claimed review can
+    therefore never stay stuck in `running` and lock its snippet behind a 409.
+    """
     try:
-        raw = await provider.review(code=code, language=language)
-        result = validate_review_output(raw, line_count)
-    except ProviderError as exc:
-        logger.warning("provider error on review %s: %s", review_id, exc)
-        result = ValidatedReview(
-            status="failed", error_code="provider_error", error_message=str(exc)
-        )
+        data = await asyncio.to_thread(_load_review_input, review_id)
+        if data is None:
+            return
+        code, language, line_count = data
 
-    await asyncio.to_thread(_persist_result, review_id, result)
+        provider = get_provider(settings)
+        try:
+            raw = await provider.review(code=code, language=language)
+            result = validate_review_output(raw, line_count)
+        except ProviderError as exc:
+            logger.warning("provider error on review %s: %s", review_id, exc)
+            result = ValidatedReview(
+                status="failed", error_code="provider_error", error_message=str(exc)
+            )
+
+        await asyncio.to_thread(_persist_result, review_id, result)
+    except Exception:
+        # Safety net: anything unexpected after the claim must not leave the row running.
+        logger.exception("unexpected error processing review %s", review_id)
+        await asyncio.to_thread(
+            _mark_failed_fresh, review_id, "The review failed unexpectedly."
+        )
 
 
 # --- The loop -------------------------------------------------------------------
