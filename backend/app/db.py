@@ -14,6 +14,7 @@ used from another thread — it does not make a Session safe to share. So:
 Models/tables are added in M1; this module only owns the connection + session factory.
 """
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine, event
@@ -62,11 +63,14 @@ def get_db():
 
 
 @contextmanager
-def session_scope() -> Session:
+def session_scope() -> Iterator[Session]:
     """A transactional Session scope for code outside a request (e.g. the M3 worker).
 
     Each call opens its own Session — the worker must use this (or SessionLocal())
     per job, never a Session borrowed from another thread/request.
+
+    Commits on clean exit (a read-only caller commits a harmless no-op) and rolls
+    back + re-raises on any exception.
     """
     db = SessionLocal()
     try:
