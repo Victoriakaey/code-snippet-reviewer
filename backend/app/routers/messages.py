@@ -105,16 +105,31 @@ async def post_message(
             },
         )
 
-    # Atomic: persist the user question + the assistant answer together.
-    db.add(FindingMessage(finding_id=finding_id, role="user", content=payload.question))
-    db.add(
-        FindingMessage(
-            finding_id=finding_id,
-            role="assistant",
-            content=answer,
-            provider=provider.name,
-            model_name=provider.model_name,
+    # Atomic: persist the user question + the assistant answer together. A persistence
+    # failure here is also a retryable condition — roll back (so no half thread is saved) and
+    # return the same 503, rather than a bare 500.
+    try:
+        db.add(FindingMessage(finding_id=finding_id, role="user", content=payload.question))
+        db.add(
+            FindingMessage(
+                finding_id=finding_id,
+                role="assistant",
+                content=answer,
+                provider=provider.name,
+                model_name=provider.model_name,
+            )
         )
-    )
-    db.commit()
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("persisting discussion for finding %s failed", finding_id)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": {
+                    "code": "discuss_failed",
+                    "message": "The discussion reply could not be saved. Please retry.",
+                }
+            },
+        )
     return _thread(db, finding_id)

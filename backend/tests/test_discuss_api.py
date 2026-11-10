@@ -110,6 +110,20 @@ def test_empty_question_422(client: TestClient, session_factory, monkeypatch):
     assert client.post(f"/api/findings/{fid}/messages", json={"question": "   "}).status_code == 422
 
 
+def test_discuss_prompt_caps_history():
+    from app.rubric import MAX_DISCUSS_HISTORY_MESSAGES, build_discuss_prompt
+
+    history = [{"role": "user", "content": f"m{i}"} for i in range(50)]
+    finding = {
+        "line_start": 1, "line_end": 1, "severity": "info", "category": "bug",
+        "description": "d", "rationale": "r", "suggested_fix": None,
+    }
+    msgs = build_discuss_prompt("x = 1", "python", finding, history, "latest question")
+    included = [m["content"] for m in msgs if m["content"].startswith("m")]
+    assert len(included) == MAX_DISCUSS_HISTORY_MESSAGES  # bounded
+    assert included[-1] == "m49"  # keeps the most recent
+
+
 def test_unknown_finding_404(client: TestClient, monkeypatch):
     monkeypatch.setattr(settings, "llm_provider", "mock")
     assert client.post("/api/findings/nope/messages", json={"question": "hi"}).status_code == 404

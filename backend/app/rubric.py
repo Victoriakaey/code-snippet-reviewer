@@ -77,6 +77,10 @@ Return JSON only, matching the provided schema."""
 
 
 DISCUSS_PROMPT_VERSION = "v1"
+# Cap how many prior thread messages are re-sent, so a long conversation does not grow the
+# prompt without bound (toward a timeout / context overflow). The most recent messages carry
+# the relevant context.
+MAX_DISCUSS_HISTORY_MESSAGES = 20
 
 DISCUSS_SYSTEM_PROMPT = """\
 You are helping a developer understand a single code review finding. Answer ONLY about that \
@@ -109,7 +113,7 @@ def build_discuss_prompt(
         {"role": "system", "content": DISCUSS_SYSTEM_PROMPT},
         {"role": "user", "content": context},
     ]
-    for msg in history:
+    for msg in history[-MAX_DISCUSS_HISTORY_MESSAGES:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": question})
     return messages
