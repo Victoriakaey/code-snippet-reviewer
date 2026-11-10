@@ -114,6 +114,8 @@ interface CodeEditorProps {
   selectedRange?: { start: number; end: number } | null;
   onLineClick?: (line: number) => void;
   minHeight?: string;
+  /** When set (e.g. "100%"), the editor fills its container instead of growing with content. */
+  height?: string;
 }
 
 export function CodeEditor({
@@ -125,6 +127,7 @@ export function CodeEditor({
   selectedRange = null,
   onLineClick,
   minHeight = "240px",
+  height,
 }: CodeEditorProps) {
   const viewRef = useRef<EditorView | null>(null);
 
@@ -156,7 +159,9 @@ export function CodeEditor({
       onChange={onChange}
       onCreateEditor={(view) => (viewRef.current = view)}
       basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLine: editable }}
-      minHeight={minHeight}
+      minHeight={height ? undefined : minHeight}
+      height={height}
+      style={height ? { height: "100%" } : undefined}
       theme="light"
     />
   );

@@ -48,6 +48,8 @@ a:hover { text-decoration: underline; }
 .app-header .sub { color: var(--muted); font-size: 13px; }
 
 .container { max-width: 1120px; margin: 0 auto; padding: 24px; }
+/* The review page needs more room than the dashboard so neither panel feels cramped. */
+.container.detail-page { max-width: min(1680px, 95vw); }
 
 /* Buttons */
 button {
@@ -102,14 +104,39 @@ table.snippets tr:last-child td { border-bottom: none; }
 .sev-info { background: var(--sev-info); }
 .cat-badge { background: #f2f4f7; color: #344054; }
 
-/* Detail layout: 65/35 split */
-.detail-grid { display: grid; grid-template-columns: 1.85fr 1fr; gap: 20px; align-items: start; }
-@media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } }
-
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
-.panel-head { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.panel-head { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 0 0 auto; }
 .panel-body { padding: 16px; }
-.code-pane { max-height: 72vh; overflow: auto; }
+
+/* Review workspace: two equal-height panels that fill the viewport and scroll independently. */
+.review-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(420px, 38%, 640px);
+  gap: 12px;
+  margin-top: 16px;
+  height: calc(100dvh - 250px);
+  min-height: 560px;
+}
+.workspace-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.panel-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.code-scroll { overflow: hidden; }          /* CodeMirror handles its own scrolling */
+.code-scroll .cm-editor { height: 100%; }
+.findings-panel .panel-scroll { padding: 14px; }
+.discussion-foot { flex: 0 0 auto; border-top: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+@media (max-width: 860px) {
+  .review-workspace { grid-template-columns: 1fr; height: auto; min-height: 0; }
+  .workspace-panel { height: 68vh; }
+}
 
 /* CodeMirror severity gutter + selected line */
 .cm-sev-gutter { width: 14px; }
@@ -124,19 +151,30 @@ table.snippets tr:last-child td { border-bottom: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Findings accordion */
-.finding { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+.findings-list { display: flex; flex-direction: column; gap: 10px; }
+.finding { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .finding.selected { border-color: var(--select-border); box-shadow: 0 0 0 2px var(--select-bg); }
-.finding.resolved { opacity: 0.72; }
-.finding-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; background: var(--panel); }
+.finding.resolved .finding-title { color: var(--muted); }
+
+/* Header: a metadata row of badges, then the title on its own full-width line. */
+.finding-head { display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; text-align: left; padding: 11px 13px; cursor: pointer; background: var(--panel); border: none; border-radius: 10px; font: inherit; color: inherit; }
 .finding-head:hover { background: #fafbfc; }
-.finding-title { flex: 1; font-size: 14px; font-weight: 500; }
+.finding-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.finding-meta .finding-line { margin-left: auto; }
+.finding-title { font-size: 14px; font-weight: 600; line-height: 1.35; word-break: break-word; }
 .finding-line { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; }
-.finding-body { padding: 0 12px 12px; font-size: 14px; }
-.finding-body h5 { margin: 12px 0 3px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.finding-body pre { background: #f8f9fb; border: 1px solid var(--border); border-radius: 8px; padding: 10px; overflow-x: auto; font-size: 13px; margin: 0; }
-.resolution-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
-.resolution-row .reason { flex: 1; min-width: 160px; }
-.res-pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+
+.finding-body { padding: 2px 13px 13px; font-size: 14px; }
+.finding-section { margin-top: 12px; }
+.finding-section h5 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.finding-section p { margin: 0; }
+.finding-section pre { background: #f8f9fb; border: 1px solid var(--border); border-radius: 8px; padding: 10px; overflow-x: auto; font-size: 13px; font-family: ui-monospace, monospace; margin: 0; }
+.finding-section.resolution { border-top: 1px dashed var(--border); padding-top: 12px; }
+
+.resolution-controls { display: flex; flex-direction: column; gap: 8px; }
+.resolution-controls .reason { width: 100%; }
+.resolution-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.res-pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
 .res-accepted { background: #ecfdf3; color: var(--ok); }
 .res-dismissed { background: #fef3f2; color: var(--fail); }
 

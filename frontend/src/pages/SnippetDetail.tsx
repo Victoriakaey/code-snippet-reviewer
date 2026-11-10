@@ -98,7 +98,7 @@ export function SnippetDetail() {
   const displayed = detail.displayed_review;
 
   return (
-    <div className="container">
+    <div className="container detail-page">
       <p style={{ marginTop: 0 }}>
         <Link to="/">← Dashboard</Link>
       </p>
@@ -143,15 +143,16 @@ export function SnippetDetail() {
         </div>
       )}
 
-      <div className="detail-grid" style={{ marginTop: 16 }}>
-        <div className="panel">
+      <div className="review-workspace">
+        <section className="workspace-panel code-panel">
           <div className="panel-head">
             <strong>Code</strong>
             <span className="muted" style={{ fontSize: 13 }}>
-              {findings.length > 0 ? "click a severity dot to jump to a finding" : ""}
+              {detail.language} · read-only
+              {findings.length > 0 ? " · click a severity dot to jump to a finding" : ""}
             </span>
           </div>
-          <div className="code-pane">
+          <div className="panel-scroll code-scroll">
             <CodeEditor
               value={detail.code}
               language={detail.language}
@@ -159,20 +160,22 @@ export function SnippetDetail() {
               findings={findings}
               selectedRange={selectedRange}
               onLineClick={selectByLine}
+              height="100%"
             />
           </div>
-        </div>
+        </section>
 
-        <div className="panel">
+        <section className="workspace-panel findings-panel">
           <div className="panel-head">
             <strong>Findings</strong>
-            {displayed && displayed.rejected_finding_count > 0 && (
-              <span className="muted" style={{ fontSize: 13 }}>
-                {displayed.rejected_finding_count} filtered
-              </span>
-            )}
+            <span className="muted" style={{ fontSize: 13 }}>
+              {displayed && findings.length > 0 ? `${findings.length} shown` : ""}
+              {displayed && displayed.rejected_finding_count > 0
+                ? ` · ${displayed.rejected_finding_count} filtered`
+                : ""}
+            </span>
           </div>
-          <div className="panel-body">
+          <div className="panel-scroll">
             {!displayed ? (
               <div className="empty">
                 {reviewActive ? "Review in progress…" : "Not reviewed yet. Run a review to see findings."}
@@ -191,16 +194,13 @@ export function SnippetDetail() {
             )}
           </div>
 
-          <div className="panel-head" style={{ borderTop: "1px solid var(--border)", borderBottom: "none" }}>
-            <strong>Discussion</strong>
-            <span className="muted" style={{ fontSize: 13 }}>Coming in M6</span>
-          </div>
-          <div className="panel-body">
+          <div className="discussion-foot">
+            <span><strong>Discussion</strong> <span className="muted">· coming in M6</span></span>
             <button className="sm" disabled title="Discuss lands in M6">
               Discuss a finding
             </button>
           </div>
-        </div>
+        </section>
       </div>
 
       {drawerOpen && displayed && (
