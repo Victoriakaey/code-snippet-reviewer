@@ -60,7 +60,9 @@ class SnippetCreate(BaseModel):
 
 
 class SnippetRead(BaseModel):
-    """Snippet response (list + detail). `status` is the derived dashboard status."""
+    """Snippet response (create + list row). `status` is the derived dashboard status;
+    `reviewer` is the latest review's model (None if never reviewed); `finding_count` is the
+    last successful review's finding count (0 if none)."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -70,6 +72,8 @@ class SnippetRead(BaseModel):
     code: str
     created_at: datetime
     status: DerivedStatus
+    reviewer: str | None = None
+    finding_count: int = 0
 
 
 class FindingRead(BaseModel):
@@ -138,3 +142,59 @@ class ReviewRead(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     findings: list[FindingRead] = []
+
+
+class ReviewSummary(BaseModel):
+    """A review's state WITHOUT its findings — used in the snippet detail (E2) to describe
+    the latest attempt and the run whose findings are being shown, separately."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    run_number: int
+    status: str
+    provider: str | None
+    model_name: str | None
+    prompt_version: str | None
+    rubric_version: str | None
+    rejected_finding_count: int
+    error_message: str | None
+    created_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+
+
+class SnippetDetail(BaseModel):
+    """GET /api/snippets/{id} — the E2 shape. `latest_review` is the newest attempt (for the
+    status header); `displayed_review` is the newest COMPLETED run whose `findings` we show.
+    When they differ, the findings are historical and the UI must label them read-only."""
+
+    id: str
+    title: str
+    language: str
+    code: str
+    created_at: datetime
+    status: DerivedStatus
+    latest_review: ReviewSummary | None
+    displayed_review: ReviewSummary | None
+    findings: list[FindingRead] = []
+
+
+class RubricDimension(BaseModel):
+    category: str
+    description: str
+
+
+class RubricSeverity(BaseModel):
+    severity: str
+    definition: str
+
+
+class RubricResponse(BaseModel):
+    """GET /api/rubric — the static, versioned rubric for the Review Details drawer."""
+
+    name: str
+    rubric_version: str
+    prompt_version: str
+    dimensions: list[RubricDimension]
+    severities: list[RubricSeverity]

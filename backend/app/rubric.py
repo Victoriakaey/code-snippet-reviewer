@@ -20,6 +20,23 @@ from .models import CATEGORIES, SEVERITIES
 RUBRIC_VERSION = "v2"  # v2: severity definitions tightened to demonstrated impact.
 PROMPT_VERSION = "v2"
 
+RUBRIC_NAME = "Code Snippet Reviewer Rubric"
+
+# Structured rubric for the Review Details drawer (GET /api/rubric). Kept in sync with the
+# prose in SYSTEM_PROMPT below.
+RUBRIC_DIMENSIONS = [
+    {"category": "bug", "description": "Correctness defects — logic errors, wrong results, crashes, unhandled edge cases."},
+    {"category": "security", "description": "Injection, unsafe deserialization, secrets in code, auth/validation gaps."},
+    {"category": "performance", "description": "Needless inefficiency that matters in realistic use."},
+    {"category": "maintainability", "description": "Readability, structure, naming, style, and clarity problems."},
+]
+
+RUBRIC_SEVERITIES = [
+    {"severity": "critical", "definition": "A demonstrably high-impact defect — a clear security vulnerability, data loss or corruption, or a failure on the main execution path that breaks normal use."},
+    {"severity": "warning", "definition": "An ordinary correctness bug, an edge-case failure, or a performance/security risk worth fixing that is not demonstrably high-impact here."},
+    {"severity": "info", "definition": "A low-impact maintainability, readability, or style suggestion."},
+]
+
 SYSTEM_PROMPT = f"""\
 You are a senior software engineer performing a focused code review of a single code \
 snippet. Review only the code provided — do not assume any external files, repositories, \

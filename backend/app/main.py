@@ -15,7 +15,7 @@ from . import models  # noqa: F401 — registers ORM tables on Base before creat
 from .config import settings
 from .db import Base, engine
 from .errors import install_error_handlers
-from .routers import findings, reviews, snippets
+from .routers import findings, reviews, rubric, snippets
 from .worker import recover_interrupted_reviews, worker_loop
 
 logger = logging.getLogger("app")
@@ -54,6 +54,7 @@ install_error_handlers(app)
 app.include_router(snippets.router)
 app.include_router(reviews.router)
 app.include_router(findings.router)
+app.include_router(rubric.router)
 
 # The Vite dev server (and its preview server) call the API from a different origin.
 app.add_middleware(
