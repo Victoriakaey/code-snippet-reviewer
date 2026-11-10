@@ -75,9 +75,9 @@ describe("SnippetDetail review-run selector", () => {
     renderDetail();
     await waitFor(() => expect(screen.getByText("Latest finding")).toBeInTheDocument());
     // One pill button per run; the latest one is marked current (aria-pressed).
-    const latestPill = screen.getByRole("button", { name: /#2/ });
+    const latestPill = screen.getByRole("button", { name: /^#2\b/ });
     expect(latestPill).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: /#1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^#1\b/ })).toBeInTheDocument();
     expect(screen.queryByText(/historical run — read-only/i)).toBeNull();
   });
 
@@ -85,7 +85,7 @@ describe("SnippetDetail review-run selector", () => {
     renderDetail();
     await waitFor(() => expect(screen.getByText("Latest finding")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: /#1/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^#1\b/ }));
 
     await waitFor(() => expect(mockGetReview).toHaveBeenCalledWith("r1"));
     await waitFor(() => expect(screen.getByText("Old finding")).toBeInTheDocument());
@@ -93,7 +93,7 @@ describe("SnippetDetail review-run selector", () => {
     // becomes the current (pressed) one.
     expect(screen.queryByText("Latest finding")).toBeNull();
     expect(screen.getByText(/historical run — read-only/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /#1/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^#1\b/ })).toHaveAttribute("aria-pressed", "true");
 
     // Expanding the historical finding offers "View discussion" (read-only), not resolve controls.
     fireEvent.click(screen.getByText("Old finding"));
@@ -104,10 +104,10 @@ describe("SnippetDetail review-run selector", () => {
   it("clicking the latest run pill restores the default (editable) view", async () => {
     renderDetail();
     await waitFor(() => expect(screen.getByText("Latest finding")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: /#1/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^#1\b/ }));
     await waitFor(() => expect(screen.getByText("Old finding")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: /#2/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^#2\b/ }));
     await waitFor(() => expect(screen.getByText("Latest finding")).toBeInTheDocument());
     expect(screen.queryByText("Old finding")).toBeNull();
     expect(screen.queryByText(/historical run — read-only/i)).toBeNull();

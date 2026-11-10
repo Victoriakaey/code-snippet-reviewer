@@ -233,7 +233,9 @@ table.snippets tr:last-child td { border-bottom: none; }
 
 /* Review-run history — a scrollable row of pill buttons (replaces the native select). */
 .run-history-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
-.run-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+/* padding (not just padding-bottom) so a focused pill's outline isn't clipped: overflow-x:auto
+   makes overflow-y clip too, and the focus ring reaches ~4px past each pill. */
+.run-pills { display: flex; gap: 6px; overflow-x: auto; padding: 4px; }
 .run-pill {
   display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
   padding: 4px 11px; border-radius: 999px; background: var(--panel);
