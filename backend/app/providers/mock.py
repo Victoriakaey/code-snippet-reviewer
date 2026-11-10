@@ -86,10 +86,22 @@ class MockProvider(ReviewProvider):
     async def discuss(
         self, *, code: str, language: str, finding: dict, history: list[dict], question: str
     ) -> str:
-        # Deterministic canned reply that echoes the finding — not a real answer.
+        # Deterministic canned reply with representative Markdown (paragraph + fenced code +
+        # a long line) so the UI's rendering and overflow handling can be exercised. Not real
+        # analysis.
         return (
-            f"(mock discussion) Regarding the {finding.get('severity')} "
-            f"{finding.get('category')} finding on lines {finding.get('line_start')}-"
-            f"{finding.get('line_end')}: this is a deterministic mock reply, not real "
-            f"analysis. You asked: {question.strip()}"
+            f"This is a deterministic **mock** reply about the "
+            f"{finding.get('severity')}/{finding.get('category')} finding on line "
+            f"{finding.get('line_start')} — not real analysis. You asked: {question.strip()}\n\n"
+            "Here is a corrected version:\n\n"
+            "```python\n"
+            "def example(numbers=None):\n"
+            "    if numbers is None:\n"
+            "        numbers = []\n"
+            "    return sum(numbers) / len(numbers)  # a deliberately long comment line to check that wide code blocks scroll horizontally instead of overflowing the panel\n"
+            "```\n\n"
+            "Key points:\n\n"
+            "- use `None` as the default\n"
+            "- initialize inside the function\n"
+            "- divide by the real length"
         )
