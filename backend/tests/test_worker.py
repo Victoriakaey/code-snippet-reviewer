@@ -273,6 +273,32 @@ def test_concurrent_enqueue_one_wins_one_conflicts(session_factory, worker_scope
         assert active == 1
 
 
+def test_worker_continues_after_a_failed_review(worker_scope, monkeypatch):
+    # A failed review (correctly marked failed) must not stop the worker from processing the
+    # next queued review. Two snippets so both can be queued at once (partial index allows
+    # one active per snippet). Oldest-first ordering claims A then B.
+    sid_a = _seed_snippet(worker_scope)
+    sid_b = _seed_snippet(worker_scope)
+    rid_a = _enqueue(worker_scope, sid_a)
+    rid_b = _enqueue(worker_scope, sid_b)
+
+    # First iteration: A's provider errors -> A failed.
+    _use_provider(monkeypatch, FakeProvider(error="boom"))
+    assert asyncio.run(worker.process_next()) is True
+
+    # Second iteration: B's provider succeeds -> B completed. Worker kept going.
+    _use_provider(monkeypatch, FakeProvider(raw='{"findings": [%s]}' % _as_json(_valid_finding())))
+    assert asyncio.run(worker.process_next()) is True
+
+    # Nothing left to do.
+    assert asyncio.run(worker.process_next()) is False
+
+    with worker_scope() as db:
+        assert db.get(Review, rid_a).status == "failed"
+        assert db.get(Review, rid_b).status == "completed"
+        assert len(db.get(Review, rid_b).findings) == 1
+
+
 def test_run_number_increments_after_completion(worker_scope):
     sid = _seed_snippet(worker_scope)
     rid1 = _enqueue(worker_scope, sid)

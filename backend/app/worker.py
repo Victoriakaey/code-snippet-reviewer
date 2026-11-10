@@ -118,10 +118,12 @@ def enqueue_review(db: Session, snippet_id: str) -> tuple[Review | None, Review 
 def claim_next_queued() -> str | None:
     """Atomically claim the oldest queued review (queued→running) and return its id."""
     with _session_scope() as db:
+        # Explicit, deterministic FIFO order: oldest first, then id as a stable tiebreak for
+        # equal timestamps (run_number is per-snippet, so it is NOT a global order).
         review_id = db.scalar(
             select(Review.id)
             .where(Review.status == "queued")
-            .order_by(Review.created_at, Review.run_number)
+            .order_by(Review.created_at, Review.id)
             .limit(1)
         )
         if review_id is None:
