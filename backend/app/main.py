@@ -1,14 +1,32 @@
 """FastAPI application entrypoint.
 
-M0 scope: app wiring, CORS for the Vite dev server, and a health endpoint. Real
-routers (snippets / reviews / findings) are added from M1 onward.
+Wiring: CORS for the Vite dev server, a liveness health endpoint, the snippet router,
+and the shared error envelope. Tables are created on startup via `create_all()` (MVP —
+this does NOT migrate an existing schema; production would use Alembic).
 """
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import models  # noqa: F401 — registers ORM tables on Base before create_all.
 from .config import settings
+from .db import Base, engine
+from .errors import install_error_handlers
+from .routers import snippets
 
-app = FastAPI(title="Code Snippet Reviewer API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Create any missing tables on startup (idempotent; no schema migration).
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title="Code Snippet Reviewer API", version="0.1.0", lifespan=lifespan)
+
+install_error_handlers(app)
+app.include_router(snippets.router)
 
 # The Vite dev server (and its preview server) call the API from a different origin.
 app.add_middleware(
