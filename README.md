@@ -4,9 +4,10 @@ A lightweight, self-service tool for AI-powered review of ad-hoc code snippets.
 Submit a snippet, trigger an LLM review, and work through the structured findings —
 accept, dismiss, or discuss each one.
 
-> **Status:** data model + snippet CRUD (M1). The AI review pipeline and the UI land in
-> later milestones. The commands below start the current backend (snippet create/list/get
-> + health) and the frontend skeleton.
+> **Status:** data model + snippet CRUD (M1) + LLM review provider & validation pipeline
+> (M2). The async review worker, finding resolution, and the UI land in later milestones.
+> The commands below start the current backend (snippet create/list/get + health) and the
+> frontend skeleton.
 
 ## Stack
 
@@ -50,13 +51,32 @@ Then open http://localhost:5173 — it should show **"✓ Backend OK · provider
 
 Copy `backend/.env.example` to `backend/.env` and adjust. Key variables:
 
-- `LLM_PROVIDER` — `ollama` (default) or `openai`. No automatic fallback between them.
-- `OLLAMA_BASE_URL`, `OLLAMA_MODEL` — local model (run `ollama pull qwen2.5-coder:7b`).
-- `OPENAI_API_KEY`, `OPENAI_MODEL` — only used when `LLM_PROVIDER=openai`; kept server-side.
+- `LLM_PROVIDER` — which review provider to use. No automatic fallback between providers.
+  - `ollama` (default) — the real local review provider.
+  - `mock` — a deterministic stand-in that needs no model; it exercises the full app flow
+    but produces placeholder findings, **not** a real review.
+  - `openai` — documented but **not implemented in this version**; selecting it fails with a
+    clear error. (A cloud adapter is future work.)
+- `OLLAMA_BASE_URL`, `OLLAMA_MODEL` — local model. Install Ollama and pull a code model,
+  e.g. `ollama pull qwen2.5-coder:7b` (any local tag works; set `OLLAMA_MODEL` to match).
 - `DATABASE_URL` — SQLite file path.
 
-> Reviewers without Ollama installed can set `LLM_PROVIDER=openai` with an API key once the
-> review pipeline lands (M2).
+> No Ollama installed? Set `LLM_PROVIDER=mock` to run the app end-to-end with deterministic
+> placeholder findings. Real AI review requires a local model via Ollama.
+
+### Trying the review provider (M2)
+
+The review pipeline is wired into an HTTP endpoint only in M3. To sanity-check a real model
+now, run the smoke script against a running Ollama:
+
+```bash
+cd backend
+OLLAMA_MODEL=<your-local-tag> .venv/bin/python scripts/ollama_smoke.py
+```
+
+It reviews three snippets and prints findings, latency, and validation outcomes. A
+structurally valid response proves the output is well-formed and in-range — never that a
+finding is semantically correct.
 
 ## API (current)
 
