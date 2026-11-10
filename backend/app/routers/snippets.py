@@ -19,6 +19,7 @@ from ..db import get_db
 from ..models import Finding, Review, Snippet
 from ..schemas import (
     DerivedStatus,
+    ReviewRunRead,
     ReviewSummary,
     SnippetCreate,
     SnippetDetail,
@@ -67,7 +68,13 @@ def _finding_count(db: Session, review: Review | None) -> int:
     ) or 0
 
 
-def _summary(db: Session, snippet: Snippet) -> SnippetRead:
+def _review_count(db: Session, snippet_id: str) -> int:
+    return db.scalar(
+        select(func.count(Review.id)).where(Review.snippet_id == snippet_id)
+    ) or 0
+
+
+def _summary(db: Session, snippet: Snippet, review_count: int | None = None) -> SnippetRead:
     latest = _latest_review(db, snippet.id)
     successful = _last_successful_review(db, snippet.id)
     return SnippetRead(
@@ -80,6 +87,9 @@ def _summary(db: Session, snippet: Snippet) -> SnippetRead:
         reviewer=latest.model_name if latest else None,
         reviewer_provider=latest.provider if latest else None,
         finding_count=_finding_count(db, successful),
+        # Caller may pass a precomputed count (list view batches it in ONE query); for a single
+        # snippet we count directly. Either way it is NOT an extra per-row query in the list.
+        review_count=_review_count(db, snippet.id) if review_count is None else review_count,
     )
 
 
@@ -99,7 +109,13 @@ def list_snippets(db: Session = Depends(get_db)) -> list[SnippetRead]:
     snippets = db.scalars(
         select(Snippet).order_by(Snippet.created_at.desc())
     ).all()
-    return [_summary(db, s) for s in snippets]
+    # Batch the per-snippet review-run count into ONE aggregate query (no extra query per row).
+    counts: dict[str, int] = dict(
+        db.execute(
+            select(Review.snippet_id, func.count(Review.id)).group_by(Review.snippet_id)
+        ).all()
+    )
+    return [_summary(db, s, review_count=counts.get(s.id, 0)) for s in snippets]
 
 
 @router.get("/{snippet_id}", response_model=SnippetDetail)
@@ -126,3 +142,42 @@ def get_snippet(snippet_id: str, db: Session = Depends(get_db)) -> SnippetDetail
         displayed_review=ReviewSummary.model_validate(displayed) if displayed else None,
         findings=findings,
     )
+
+
+@router.get("/{snippet_id}/reviews", response_model=list[ReviewRunRead])
+def list_snippet_reviews(snippet_id: str, db: Session = Depends(get_db)) -> list[ReviewRunRead]:
+    """Read-only run history for a snippet: every review run (queued/running/completed/failed),
+    newest first, each with its finding count. Powers the run selector — it only LISTS runs; the
+    read-only rule for modifying a historical run's findings/discussion is enforced where those
+    writes happen (PATCH /findings, POST /findings/{id}/messages), not here."""
+    if db.get(Snippet, snippet_id) is None:
+        raise HTTPException(status_code=404, detail="snippet not found")
+
+    reviews = db.scalars(
+        select(Review)
+        .where(Review.snippet_id == snippet_id)
+        .order_by(Review.run_number.desc())
+    ).all()
+    # Finding counts for all of this snippet's runs in ONE aggregate query (no per-run query).
+    counts: dict[str, int] = dict(
+        db.execute(
+            select(Finding.review_id, func.count(Finding.id))
+            .where(Finding.review_id.in_([r.id for r in reviews]))
+            .group_by(Finding.review_id)
+        ).all()
+    ) if reviews else {}
+
+    return [
+        ReviewRunRead(
+            id=r.id,
+            run_number=r.run_number,
+            status=r.status,
+            provider=r.provider,
+            model_name=r.model_name,
+            error_message=r.error_message,
+            created_at=r.created_at,
+            completed_at=r.completed_at,
+            finding_count=counts.get(r.id, 0),
+        )
+        for r in reviews
+    ]

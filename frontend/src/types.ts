@@ -19,6 +19,19 @@ export interface SnippetRow {
   reviewer: string | null;
   reviewer_provider: string | null;
   finding_count: number;
+  review_count: number;
+}
+
+export interface ReviewRun {
+  id: string;
+  run_number: number;
+  status: ReviewStatus;
+  provider: string | null;
+  model_name: string | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+  finding_count: number;
 }
 
 export interface Finding {

@@ -102,6 +102,7 @@ export function Dashboard() {
               <th>Title</th>
               <th>Language</th>
               <th>Reviewer</th>
+              <th>Reviews</th>
               <th>Findings</th>
               <th>Status</th>
               <th>Created</th>
@@ -123,6 +124,7 @@ export function Dashboard() {
                     s.reviewer
                   )}
                 </td>
+                <td className="muted">{s.review_count}</td>
                 <td className="muted">{s.status === "reviewed" ? s.finding_count : "—"}</td>
                 <td>
                   <StatusBadge status={s.status} />

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { createReview, getSnippet, ApiError } from "../api";
+import { createReview, getSnippet, getReview, listSnippetReviews, ApiError } from "../api";
 import { useReviewPolling } from "../hooks/useReviewPolling";
-import type { Finding, Review, ReviewStatus, SnippetDetail as Detail } from "../types";
+import type { Finding, Review, ReviewRun, ReviewStatus, SnippetDetail as Detail } from "../types";
 import { CodeEditor } from "../components/CodeEditor";
 import { FindingsPanel } from "../components/FindingsPanel";
 import { DiscussionView } from "../components/DiscussionView";
@@ -22,11 +22,20 @@ export function SnippetDetail() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [discussingId, setDiscussingId] = useState<string | null>(null);
+  const [runs, setRuns] = useState<ReviewRun[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
 
   const loadDetail = useCallback(() => {
     getSnippet(id)
       .then(setDetail)
       .catch((e) => setLoadError(e instanceof ApiError ? e.message : "Failed to load."));
+  }, [id]);
+
+  const loadRuns = useCallback(() => {
+    listSnippetReviews(id)
+      .then(setRuns)
+      .catch(() => setRuns([])); // the run selector is additive; its failure must not break the page
   }, [id]);
 
   // Reset per-snippet state and load whenever the id changes (also handles direct URL open).
@@ -37,39 +46,68 @@ export function SnippetDetail() {
     setTriggeredReviewId(null);
     setSelectedId(null);
     setDiscussingId(null);
+    setSelectedRunId(null);
+    setSelectedReview(null);
     loadDetail();
-  }, [id, loadDetail]);
+    loadRuns();
+  }, [id, loadDetail, loadRuns]);
 
   const onTerminal = useCallback(() => {
     setTriggeredReviewId(null);
+    setSelectedRunId(null); // a new run finished -> snap the view back to the latest
+    setSelectedReview(null);
     loadDetail(); // refresh findings + E2 shape once the run finishes
-  }, [loadDetail]);
+    loadRuns();
+  }, [loadDetail, loadRuns]);
 
   const { review: liveReview, pollError, retry } = useReviewPolling(
     triggeredReviewId,
     onTerminal,
   );
 
-  const findings = detail?.findings ?? [];
-  const codeLines = useMemo(() => (detail ? detail.code.split("\n") : []), [detail]);
-  const selectedFinding = findings.find((f) => f.id === selectedId) ?? null;
-  const discussingFinding = findings.find((f) => f.id === discussingId) ?? null;
-  const selectedRange = selectedFinding
-    ? { start: selectedFinding.line_start, end: selectedFinding.line_end }
-    : null;
-
-  // Findings are historical (read-only) when the run they belong to is not the latest attempt.
+  // Findings are historical (read-only) when the DEFAULT-shown run is not the latest attempt.
   const historical =
     !!detail?.latest_review &&
     !!detail?.displayed_review &&
     detail.latest_review.id !== detail.displayed_review.id;
 
+  // The run selector can point the view at an OLDER run (always read-only). With no explicit
+  // selection we show the default E2 view (last-successful findings, editable iff it is latest).
+  const viewedFindings = selectedReview ? selectedReview.findings : (detail?.findings ?? []);
+  const viewedReadOnly = selectedReview ? true : historical;
+
+  const codeLines = useMemo(() => (detail ? detail.code.split("\n") : []), [detail]);
+  const selectedFinding = viewedFindings.find((f) => f.id === selectedId) ?? null;
+  const discussingFinding = viewedFindings.find((f) => f.id === discussingId) ?? null;
+  const selectedRange = selectedFinding
+    ? { start: selectedFinding.line_start, end: selectedFinding.line_end }
+    : null;
+
   const headerStatus: ReviewStatus | null =
     liveReview?.status ?? detail?.latest_review?.status ?? null;
   const reviewActive = headerStatus !== null && ACTIVE.includes(headerStatus);
 
+  const latestRunId = detail?.latest_review?.id ?? null;
+  // Switching runs is view-only: an older run loads read-only; picking the latest (or clearing)
+  // falls back to the default editable/E2 view. The backend enforces read-only regardless.
+  function onSelectRun(runId: string) {
+    setSelectedId(null);
+    setDiscussingId(null);
+    setRunError(null);
+    if (!runId || runId === latestRunId) {
+      setSelectedRunId(null);
+      setSelectedReview(null);
+      return;
+    }
+    setSelectedRunId(runId);
+    setSelectedReview(null);
+    getReview(runId)
+      .then(setSelectedReview)
+      .catch((e) => setRunError(e instanceof ApiError ? e.message : "Could not load that run."));
+  }
+
   function selectByLine(line: number) {
-    const f = findings.find((f) => f.line_start <= line && line <= f.line_end);
+    const f = viewedFindings.find((f) => f.line_start <= line && line <= f.line_end);
     if (f) setSelectedId(f.id);
   }
 
@@ -100,6 +138,9 @@ export function SnippetDetail() {
   if (!detail) return <div className="container"><div className="empty">Loading…</div></div>;
 
   const displayed = detail.displayed_review;
+  // The run whose findings are on screen (the selected older run, else the default E2 run).
+  const viewedRun = selectedReview ?? displayed;
+  const viewedFailed = selectedReview?.status === "failed";
 
   return (
     <div className="container detail-page">
@@ -128,9 +169,30 @@ export function SnippetDetail() {
         liveError={liveReview?.status === "failed" ? liveReview.error_message : null}
         onOpenDrawer={() => setDrawerOpen(true)}
       />
+
+      {runs.length > 1 && (
+        <div className="run-selector" style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <label htmlFor="run-select" className="muted" style={{ fontSize: 13 }}>Review run</label>
+          <select
+            id="run-select"
+            value={selectedRunId ?? latestRunId ?? ""}
+            onChange={(e) => onSelectRun(e.target.value)}
+          >
+            {runs.map((r) => (
+              <option key={r.id} value={r.id}>
+                Review #{r.run_number} · {r.status}
+                {r.id === latestRunId ? " · latest" : ""} ({r.finding_count} finding{r.finding_count === 1 ? "" : "s"})
+              </option>
+            ))}
+          </select>
+          {selectedReview && (
+            <span className="muted" style={{ fontSize: 13 }}>Viewing a historical run — read-only.</span>
+          )}
+        </div>
+      )}
       {runError && <div className="error-box" style={{ marginTop: 8 }}>{runError}</div>}
 
-      {displayed && isMockReviewer(displayed.provider) && (
+      {viewedRun && isMockReviewer(viewedRun.provider) && (
         <div className="mock-banner" style={{ marginTop: 10 }}>
           <strong>Mock review · Demo.</strong> These findings are deterministic test data from
           the mock provider, not real AI analysis. Run the backend with{" "}
@@ -153,7 +215,7 @@ export function SnippetDetail() {
             <strong>Code</strong>
             <span className="muted" style={{ fontSize: 13 }}>
               {detail.language} · read-only
-              {findings.length > 0 ? " · click a severity dot to jump to a finding" : ""}
+              {viewedFindings.length > 0 ? " · click a severity dot to jump to a finding" : ""}
             </span>
           </div>
           <div className="panel-scroll code-scroll">
@@ -161,7 +223,7 @@ export function SnippetDetail() {
               value={detail.code}
               language={detail.language}
               editable={false}
-              findings={findings}
+              findings={viewedFindings}
               selectedRange={selectedRange}
               onLineClick={selectByLine}
               height="100%"
@@ -173,7 +235,7 @@ export function SnippetDetail() {
           {discussingFinding ? (
             <DiscussionView
               finding={discussingFinding}
-              readOnly={historical}
+              readOnly={viewedReadOnly}
               onBack={() => setDiscussingId(null)}
             />
           ) : (
@@ -181,26 +243,31 @@ export function SnippetDetail() {
               <div className="panel-head">
                 <strong>Findings</strong>
                 <span className="muted" style={{ fontSize: 13 }}>
-                  {displayed && findings.length > 0 ? `${findings.length} shown` : ""}
-                  {displayed && displayed.rejected_finding_count > 0
-                    ? ` · ${displayed.rejected_finding_count} filtered`
+                  {!viewedFailed && viewedRun && viewedFindings.length > 0 ? `${viewedFindings.length} shown` : ""}
+                  {!viewedFailed && viewedRun && viewedRun.rejected_finding_count > 0
+                    ? ` · ${viewedRun.rejected_finding_count} filtered`
                     : ""}
                 </span>
               </div>
               <div className="panel-scroll">
-                {!displayed ? (
+                {viewedFailed && selectedReview ? (
+                  <div className="empty">
+                    Review #{selectedReview.run_number} failed
+                    {selectedReview.error_message ? `: ${selectedReview.error_message}` : ""}. No findings for this run.
+                  </div>
+                ) : !viewedRun ? (
                   <div className="empty">
                     {reviewActive ? "Review in progress…" : "Not reviewed yet. Run a review to see findings."}
                   </div>
-                ) : findings.length === 0 ? (
-                  <div className="empty">No issues found in review #{displayed.run_number}.</div>
+                ) : viewedFindings.length === 0 ? (
+                  <div className="empty">No issues found in review #{viewedRun.run_number}.</div>
                 ) : (
                   <FindingsPanel
-                    findings={findings}
+                    findings={viewedFindings}
                     codeLines={codeLines}
                     selectedId={selectedId}
                     onSelect={setSelectedId}
-                    readOnly={historical}
+                    readOnly={viewedReadOnly}
                     onResolved={onResolved}
                     onDiscuss={setDiscussingId}
                   />

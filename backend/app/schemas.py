@@ -75,6 +75,9 @@ class SnippetRead(BaseModel):
     reviewer: str | None = None
     reviewer_provider: str | None = None  # so the UI can flag a mock (demo) reviewer
     finding_count: int = 0
+    # Total review RUNS for this snippet (all statuses: queued/running/completed/failed) —
+    # distinct from finding_count. 0 when never reviewed.
+    review_count: int = 0
 
 
 class FindingRead(BaseModel):
@@ -143,6 +146,24 @@ class ReviewRead(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     findings: list[FindingRead] = []
+
+
+class ReviewRunRead(BaseModel):
+    """One run in a snippet's review history (read-only run list for the run selector). Carries
+    a `finding_count` so the selector can show how many findings a run produced; runs that are
+    queued/running/failed, or completed with no issues, show 0."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    run_number: int
+    status: str
+    provider: str | None
+    model_name: str | None
+    error_message: str | None
+    created_at: datetime
+    completed_at: datetime | None
+    finding_count: int = 0
 
 
 class ReviewSummary(BaseModel):

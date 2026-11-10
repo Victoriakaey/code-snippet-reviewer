@@ -4,6 +4,7 @@
 
 import type {
   Review,
+  ReviewRun,
   Rubric,
   SnippetDetail,
   SnippetRow,
@@ -80,6 +81,9 @@ export const createReview = (snippetId: string) =>
   request<Review>(`/api/snippets/${snippetId}/reviews`, { method: "POST" });
 
 export const getReview = (id: string) => request<Review>(`/api/reviews/${id}`);
+
+export const listSnippetReviews = (snippetId: string) =>
+  request<ReviewRun[]>(`/api/snippets/${snippetId}/reviews`);
 
 export const patchFinding = (id: string, body: ResolutionUpdate) =>
   request<Finding>(`/api/findings/${id}`, { method: "PATCH", body: JSON.stringify(body) });
