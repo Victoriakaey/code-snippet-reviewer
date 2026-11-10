@@ -88,6 +88,32 @@ X" from "X was verified to actually hold."
   a stray manual "Run review" that overwrote a fixture mid-test was caught (via the backend
   log) and repaired without deleting any existing data.
 
+### Example 6 — A real OpenAI provider, validated against the live API and benchmarked honestly
+- **AI contributed:** a third provider (`gpt-5-mini`) behind the same interface, plus the first
+  draft of a "7/8 vs 3/8, it's clearly better" benchmark write-up.
+- **Verified against the real API (not mocks):** one controlled smoke call first (`max_retries=0`,
+  key read only from the gitignored `.env`, never printed), then the full application path over
+  HTTP — review → finding persistence → grounded discussion → resolution → historical read-only
+  — on an isolated database, and finally the T1–T8 adversarial set once each with the same
+  snippets / rubric / prompt as the local model. `gpt-5-mini` genuinely fixed cases the 7B model
+  failed: it derived an average's off-by-one divisor instead of hallucinating a `ZeroDivisionError`,
+  explained a slice off-by-one correctly, and refused a prompt-injection comment ordering it to
+  report nothing.
+- **Corrected (the honest part):** the first write-up said "7/8 correct," which implied seven
+  *clean* reviews. That was wrong — on T2 and T8, code we expected to be **clean**, the model
+  still produced findings (on T8, two of them tagged `warning`/`bug` for edge cases that are only
+  defects if the function's contract allows those inputs). The claim was corrected to separate two
+  different things: **true-bug detection** (strong) from an **over-reporting / false-positive
+  tendency on clean code** (a real limitation). The benchmark is 8 examples — a qualitative
+  signal, explicitly **not** a statistical accuracy claim.
+- **Decision it informed:** keep `ollama` as the default (local, free, private) and offer
+  `gpt-5-mini` as a supported *optional* higher-quality provider — not a new default, because
+  "never reports clean" is a poor fit for an unattended default. No rubric changes were made to
+  chase the benchmark.
+- **Lesson:** "the stronger model scored higher" is the tempting headline; the accurate one
+  separates *recall on real bugs* from *noise on clean code*, and reports the cost/latency/privacy
+  price alongside the quality win.
+
 ---
 
 ## 3. What AI did not decide

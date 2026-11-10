@@ -79,6 +79,49 @@ Copy `backend/.env.example` to `backend/.env` and adjust. Key variables:
 > No Ollama installed? Set `LLM_PROVIDER=mock` to run the app end-to-end with deterministic
 > placeholder findings. Real AI review requires a local model via Ollama.
 
+### Using OpenAI (`gpt-5-mini`) — real cloud reviews
+
+The OpenAI provider is **fully implemented and has been validated against the live API**, not
+just mocked. To switch from the local default to the cloud model, set three things in
+`backend/.env` (the key is read only from the environment / this gitignored file — never
+hardcoded, never logged):
+
+```dotenv
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-...        # your key; keep it out of source control and chat
+OPENAI_MODEL=gpt-5-mini
+```
+
+**With Docker**, pass the key through from your host shell (the compose file already forwards
+`OPENAI_API_KEY` and `OPENAI_MODEL`, and never bakes them into the image):
+
+```bash
+LLM_PROVIDER=openai OPENAI_API_KEY=sk-... docker compose up --build
+```
+
+(Without Docker, the same three variables in `backend/.env` are picked up by the backend.)
+
+**Trade-offs — pick the provider per use, there is no automatic fallback:**
+
+| | `ollama` (default) | `openai` / `gpt-5-mini` |
+|---|---|---|
+| **Privacy** | local, code never leaves the machine | code is sent to OpenAI |
+| **Cost** | free | paid (~`$0.003` per review in testing) |
+| **Latency** | ~6 s / review | ~18–35 s / review |
+| **Quality** | weaker on hard cases | stronger true-bug detection |
+
+**Model-quality limitations (measured, not assumed).** A small 8-case adversarial benchmark
+(T1–T8, one run each, same snippets / rubric / prompt as the local model) showed `gpt-5-mini`
+clearly better at **finding real bugs** — it correctly derived an average's off-by-one divisor,
+explained a slice off-by-one, flagged SQL injection, and did **not** obey a prompt-injection
+comment telling it to report nothing. But it also has a measurable **over-reporting tendency**:
+on code that is actually clean it still emits findings, and will tag defensible edge-case
+concerns (e.g. "this breaks for a generator / a non-integer argument") as `warning`/`bug` rather
+than as a potential boundary limitation. Treat `gpt-5-mini` as **higher recall on real bugs, at
+the cost of more false positives on clean code** — it rarely reports "no issues." Eight examples
+are a qualitative signal, not a statistical claim. Provenance stored per review is the configured
+model **alias** (`gpt-5-mini`), not the dated API build string the API returns.
+
 > **Optional:** `backend/scripts/ollama_smoke.py` reviews three sample snippets against a
 > running Ollama and prints findings, latency, and validation outcomes — a quick check that a
 > local model responds in the expected shape (shape only, never semantic correctness).
