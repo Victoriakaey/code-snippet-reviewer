@@ -32,6 +32,7 @@ def _seed(session_factory: sessionmaker, reviews: list[tuple[int, str, int]]):
         for run, status, n in reviews:
             rev = Review(
                 snippet_id=snip.id, run_number=run, status=status,
+                provider="ollama" if status == "completed" else None,
                 model_name="qwen-test" if status == "completed" else None,
             )
             s.add(rev)
@@ -55,6 +56,7 @@ def test_list_includes_reviewer_and_finding_count(client: TestClient, session_fa
     row = next(r for r in client.get("/api/snippets").json() if r["id"] == sid)
     assert row["status"] == "reviewed"
     assert row["reviewer"] == "qwen-test"
+    assert row["reviewer_provider"] == "ollama"
     assert row["finding_count"] == 2
 
 

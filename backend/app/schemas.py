@@ -73,6 +73,7 @@ class SnippetRead(BaseModel):
     created_at: datetime
     status: DerivedStatus
     reviewer: str | None = None
+    reviewer_provider: str | None = None  # so the UI can flag a mock (demo) reviewer
     finding_count: int = 0
 
 

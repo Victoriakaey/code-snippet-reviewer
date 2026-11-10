@@ -78,6 +78,7 @@ def _summary(db: Session, snippet: Snippet) -> SnippetRead:
         created_at=snippet.created_at,
         status=_derive_status(latest),
         reviewer=latest.model_name if latest else None,
+        reviewer_provider=latest.provider if latest else None,
         finding_count=_finding_count(db, successful),
     )
 
