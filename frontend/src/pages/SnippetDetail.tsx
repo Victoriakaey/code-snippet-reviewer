@@ -8,6 +8,7 @@ import { CodeEditor } from "../components/CodeEditor";
 import { FindingsPanel } from "../components/FindingsPanel";
 import { ReviewDetailsDrawer } from "../components/ReviewDetailsDrawer";
 import { LangBadge } from "../components/badges";
+import { isMockReviewer } from "../mock";
 
 const ACTIVE: ReviewStatus[] = ["queued", "running"];
 
@@ -41,7 +42,10 @@ export function SnippetDetail() {
     loadDetail(); // refresh findings + E2 shape once the run finishes
   }, [loadDetail]);
 
-  const liveReview = useReviewPolling(triggeredReviewId, onTerminal);
+  const { review: liveReview, pollError, retry } = useReviewPolling(
+    triggeredReviewId,
+    onTerminal,
+  );
 
   const findings = detail?.findings ?? [];
   const codeLines = useMemo(() => (detail ? detail.code.split("\n") : []), [detail]);
@@ -121,6 +125,23 @@ export function SnippetDetail() {
         onOpenDrawer={() => setDrawerOpen(true)}
       />
       {runError && <div className="error-box" style={{ marginTop: 8 }}>{runError}</div>}
+
+      {displayed && isMockReviewer(displayed.provider) && (
+        <div className="mock-banner" style={{ marginTop: 10 }}>
+          <strong>Mock review · Demo.</strong> These findings are deterministic test data from
+          the mock provider, not real AI analysis. Run the backend with{" "}
+          <code>LLM_PROVIDER=ollama</code> for a real review.
+        </div>
+      )}
+
+      {pollError && (
+        <div className="poll-error" style={{ marginTop: 10 }}>
+          <span>Unable to refresh the review status. {pollError}</span>
+          <button className="sm" onClick={retry}>
+            Retry status check
+          </button>
+        </div>
+      )}
 
       <div className="detail-grid" style={{ marginTop: 16 }}>
         <div className="panel">

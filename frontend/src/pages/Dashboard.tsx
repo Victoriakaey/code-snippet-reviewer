@@ -5,6 +5,7 @@ import { listSnippets, ApiError } from "../api";
 import { LANGUAGES, type DerivedStatus, type Language, type SnippetRow } from "../types";
 import { CreateSnippet } from "../components/CreateSnippet";
 import { LangBadge, StatusBadge } from "../components/badges";
+import { isMockReviewer } from "../mock";
 
 const STATUS_FILTERS: { value: DerivedStatus | "all"; label: string }[] = [
   { value: "all", label: "All statuses" },
@@ -113,7 +114,15 @@ export function Dashboard() {
                 <td>
                   <LangBadge language={s.language} />
                 </td>
-                <td className="muted">{s.reviewer ?? "—"}</td>
+                <td className="muted">
+                  {s.reviewer === null ? (
+                    "—"
+                  ) : isMockReviewer(s.reviewer_provider) ? (
+                    <span className="mock-tag">Mock · Demo</span>
+                  ) : (
+                    s.reviewer
+                  )}
+                </td>
                 <td className="muted">{s.status === "reviewed" ? s.finding_count : "—"}</td>
                 <td>
                   <StatusBadge status={s.status} />

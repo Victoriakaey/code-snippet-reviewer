@@ -17,6 +17,7 @@ export interface SnippetRow {
   created_at: string;
   status: DerivedStatus;
   reviewer: string | null;
+  reviewer_provider: string | null;
   finding_count: number;
 }
 
