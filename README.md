@@ -130,8 +130,11 @@ model **alias** (`gpt-5-mini`), not the dated API build string the API returns.
 
 - `POST /api/snippets` — create a snippet (`title`, `language`, `code`) → `201`. Validation
   failures (empty title/code, unsupported language, oversized input) → `422`.
-- `GET /api/snippets` — list snippets, newest first, each with a derived status.
+- `GET /api/snippets` — list snippets, newest first, each with a derived status and a
+  review-run count (the dashboard's **Reviews** column).
 - `GET /api/snippets/{id}` — one snippet, or `404`.
+- `GET /api/snippets/{id}/reviews` — the snippet's review runs, newest first (id, run number,
+  status, provider/model, finding count). Powers the UI's read-only **Review history** selector.
 - `POST /api/snippets/{id}/reviews` — trigger a review → `202` + a `queued` review. `409`
   (with the active review's id) if one is already in progress; `404` if the snippet is gone.
 - `GET /api/reviews/{id}` — poll a review: `queued` / `running` / `completed` (with findings)
@@ -205,6 +208,11 @@ quick model call awaited in the request (it does not need the job machinery).
 - **Discussion persistence is atomic.** The user question and the AI answer are saved together
   or not at all; a model/DB failure saves nothing and returns a retryable `503`. Older reviews'
   findings and discussions are read-only (resolutions and new messages are blocked with `409`).
+- **Every review run is navigable (read-only).** The snippet page has a **Review history** run
+  selector; picking an older run shows that run's findings, its own provenance in **Review
+  details**, and a read-only banner. A failed run shows its own status and sanitized error. The
+  dashboard's **Reviews** column counts the runs. The backend enforces read-only regardless of
+  the UI (older runs → `409`).
 - **Schema migration without Alembic (deliberate minimal stand-in).** `create_all()` builds
   missing tables; a tiny `ensure_schema()` adds missing additive columns on startup and fails
   loudly rather than running on a broken schema.
@@ -220,10 +228,6 @@ quick model call awaited in the request (it does not need the job machinery).
   very long messages can still be large.
 - **Dashboard `GET /api/snippets` is N+1** (a few queries per row) and two components
   (`SnippetDetail`, `DiscussionView`) carry more complexity than ideal — known tech debt.
-- **No UI to reach an older review's findings/discussions.** Once a newer review succeeds, prior
-  runs stay in the database but are not navigable in the UI. A read-only run-history entry point
-  is a **post-MVP roadmap item** (it touches the read-only invariants, so it was not bundled
-  into delivery).
 - **Hybrid static-analysis + LLM review is deferred** — reviews are LLM-only.
 - **Local-model reality:** quality and latency depend on the chosen Ollama model; a review and a
   discussion can contend for the model. There is no scheduler — both have timeouts and the UI

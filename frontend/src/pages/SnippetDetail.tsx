@@ -10,6 +10,7 @@ import { DiscussionView } from "../components/DiscussionView";
 import { ReviewDetailsDrawer } from "../components/ReviewDetailsDrawer";
 import { LangBadge } from "../components/badges";
 import { isMockReviewer } from "../mock";
+import { reviewFailureSentence } from "../failureText";
 
 const ACTIVE: ReviewStatus[] = ["queued", "running"];
 
@@ -265,8 +266,7 @@ export function SnippetDetail() {
               <div className="panel-scroll">
                 {viewedFailed && selectedReview ? (
                   <div className="empty">
-                    Review #{selectedReview.run_number} failed
-                    {selectedReview.error_message ? `: ${selectedReview.error_message}` : ""}. No findings for this run.
+                    {reviewFailureSentence(selectedReview.run_number, selectedReview.error_message)} No findings for this run.
                   </div>
                 ) : !viewedRun ? (
                   <div className="empty">
@@ -291,8 +291,8 @@ export function SnippetDetail() {
         </section>
       </div>
 
-      {drawerOpen && displayed && (
-        <ReviewDetailsDrawer review={displayed} onClose={() => setDrawerOpen(false)} />
+      {drawerOpen && viewedRun && (
+        <ReviewDetailsDrawer review={viewedRun} onClose={() => setDrawerOpen(false)} />
       )}
     </div>
   );
@@ -331,7 +331,7 @@ function StatusHeader({ status, latest, displayed, historical, liveError, onOpen
             <>
               <span className="status-failed badge">Latest failed</span>
               <span className="muted">
-                Review #{latest?.run_number} failed{liveError || latest?.error_message ? `: ${liveError ?? latest?.error_message}` : ""}.
+                {reviewFailureSentence(latest?.run_number, liveError ?? latest?.error_message)}
               </span>
             </>
           )}

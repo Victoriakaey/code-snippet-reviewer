@@ -123,8 +123,11 @@ X" from "X was verified to actually hold."
 - Semantic correctness of a review finding — the product never claims a finding is correct,
   only that it is well-formed and in-range; the same honesty applies to how this project was
   built.
-- Scope — real gaps found during acceptance (e.g. no UI to reach an older review's findings)
-  were recorded as post-MVP roadmap items, not silently added to the final milestone.
+- Scope — real gaps found during acceptance (e.g. hybrid static-analysis + LLM review, and
+  exactly-once discussion under network failures) were recorded as post-MVP items, not silently
+  added to the final milestone. (The read-only review-history UI, once such a gap, was later
+  built and browser-accepted — see the **Review history** selector and dashboard **Reviews**
+  count.)
 
 ---
 
