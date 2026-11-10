@@ -7,7 +7,13 @@ import httpx
 import pytest
 
 from app.config import Settings
-from app.providers import MockProvider, OllamaProvider, ProviderError, get_provider
+from app.providers import (
+    MockProvider,
+    OllamaProvider,
+    OpenAIProvider,
+    ProviderError,
+    get_provider,
+)
 from app.review_pipeline import validate_review_output
 
 
@@ -70,10 +76,18 @@ def test_factory_selects_mock():
     assert isinstance(get_provider(cfg), MockProvider)
 
 
-def test_factory_rejects_unimplemented_openai():
-    cfg = Settings(llm_provider="openai")
-    with pytest.raises(ProviderError, match="not implemented"):
+def test_factory_openai_requires_api_key():
+    cfg = Settings(llm_provider="openai", openai_api_key="")
+    with pytest.raises(ProviderError, match="OPENAI_API_KEY"):
         get_provider(cfg)
+
+
+def test_factory_selects_openai_with_key():
+    cfg = Settings(llm_provider="openai", openai_api_key="sk-test-not-used", openai_model="gpt-5-mini")
+    provider = get_provider(cfg)
+    assert isinstance(provider, OpenAIProvider)
+    assert provider.name == "openai"
+    assert provider.model_name == "gpt-5-mini"
 
 
 def test_factory_rejects_unknown_provider():

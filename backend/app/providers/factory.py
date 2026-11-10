@@ -1,11 +1,12 @@
 """Explicit provider selection from LLM_PROVIDER — no silent fallback.
 
-Only providers whose adapter is actually implemented are selectable:
+Selectable providers (each with an implemented adapter):
 - `ollama` — the real local review provider.
-- `mock`   — deterministic stand-in for tests / running the app without Ollama.
+- `openai` — a real cloud provider via the OpenAI SDK (requires OPENAI_API_KEY).
+- `mock`   — deterministic stand-in for tests / running the app without any model.
 
-`openai` is documented but NOT implemented in v1. Selecting it raises a clear ProviderError
-at selection time, rather than failing with an obscure error deep inside a request.
+An unconfigured or unknown provider raises a clear ProviderError at selection time, rather
+than failing with an obscure error deep inside a request.
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ from ..config import Settings, settings as default_settings
 from .base import ProviderError, ReviewProvider
 from .mock import MockProvider
 from .ollama import OllamaProvider
+from .openai import OpenAIProvider
 
 
 def get_provider(settings: Settings | None = None) -> ReviewProvider:
@@ -28,8 +30,15 @@ def get_provider(settings: Settings | None = None) -> ReviewProvider:
     if provider == "mock":
         return MockProvider()
     if provider == "openai":
-        raise ProviderError(
-            "LLM_PROVIDER=openai is not implemented in this version. "
-            "Use 'ollama' (local) or 'mock'."
+        if not cfg.openai_api_key:
+            raise ProviderError(
+                "LLM_PROVIDER=openai requires OPENAI_API_KEY to be set in the environment."
+            )
+        return OpenAIProvider(
+            api_key=cfg.openai_api_key,
+            model=cfg.openai_model,
+            timeout=cfg.openai_timeout,
+            reasoning_effort=cfg.openai_reasoning_effort,
+            max_output_tokens=cfg.openai_max_output_tokens,
         )
     raise ProviderError(f"unknown LLM_PROVIDER: {provider!r}")

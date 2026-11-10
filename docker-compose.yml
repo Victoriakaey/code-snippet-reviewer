@@ -7,8 +7,13 @@ services:
       - LLM_PROVIDER=ollama
       # A container's localhost is the container, not the host. Reach a host-installed Ollama
       # via host.docker.internal (Docker Desktop resolves it; the extra_hosts entry below adds
-      # it on Linux). Set LLM_PROVIDER=mock to run without Ollama.
+      # it on Linux). Set LLM_PROVIDER=mock to run without Ollama, or LLM_PROVIDER=openai with
+      # an OPENAI_API_KEY (passed through from your shell env below) to use the cloud provider.
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      # Forwarded from the host shell when set; never baked into the image. Only used when
+      # LLM_PROVIDER=openai.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-5-mini}
       # Absolute path inside the container; the named volume persists the SQLite file.
       - DATABASE_URL=sqlite:////app/data/app.db
     extra_hosts:

@@ -8,11 +8,13 @@ from .base import ProviderError, ReviewProvider
 from .factory import get_provider
 from .mock import MockProvider
 from .ollama import OllamaProvider
+from .openai import OpenAIProvider
 
 __all__ = [
     "ProviderError",
     "ReviewProvider",
     "MockProvider",
     "OllamaProvider",
+    "OpenAIProvider",
     "get_provider",
 ]

@@ -172,3 +172,24 @@ FINDINGS_SCHEMA: dict = {
 REQUIRED_FINDING_FIELDS = ("line_start", "line_end", "description", "rationale",
                            "category", "severity")
 OPTIONAL_FINDING_FIELDS = ("suggested_fix",)
+
+
+def _openai_strict_schema() -> dict:
+    """OpenAI strict structured outputs are stricter than Ollama's `format`: EVERY property of
+    every object must be listed in `required` (optionality is expressed as a nullable type, not
+    an absent key), and every object needs `additionalProperties: false`. We DERIVE this variant
+    from `FINDINGS_SCHEMA` (deep-copied) so the two cannot drift: the only differences are that
+    `suggested_fix` becomes nullable (`["string", "null"]`) and is added to the item `required`
+    list. The Ollama `FINDINGS_SCHEMA` above is left exactly as-is. The validator is unchanged —
+    it already treats a null/absent `suggested_fix` as None."""
+    import copy
+
+    schema = copy.deepcopy(FINDINGS_SCHEMA)
+    item = schema["properties"]["findings"]["items"]
+    item["properties"]["suggested_fix"] = {"type": ["string", "null"]}
+    item["required"] = [*REQUIRED_FINDING_FIELDS, "suggested_fix"]
+    return schema
+
+
+# Strict variant passed to OpenAI structured outputs. Additive — never used by Ollama/Mock.
+OPENAI_FINDINGS_SCHEMA: dict = _openai_strict_schema()

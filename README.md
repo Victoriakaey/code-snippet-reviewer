@@ -14,7 +14,8 @@ honest account of how AI was used to build it.
 - **Frontend:** React + TypeScript + Vite
 - **Backend:** FastAPI + Pydantic
 - **Database:** SQLite + SQLAlchemy (foreign keys + WAL enabled)
-- **AI:** Ollama-first (local), selected via `LLM_PROVIDER`; optional cloud provider later
+- **AI:** three providers behind one interface, selected via `LLM_PROVIDER` — `ollama` (local),
+  `openai` (cloud), or `mock` (deterministic, no model); no automatic fallback between them
 
 ## Run it
 
@@ -60,14 +61,20 @@ Then open http://localhost:5173 — it should show **"✓ Backend OK · provider
 Copy `backend/.env.example` to `backend/.env` and adjust. Key variables:
 
 - `LLM_PROVIDER` — which review provider to use. No automatic fallback between providers.
-  - `ollama` (default) — the real local review provider.
+  - `ollama` (default) — a real **local** model (private, offline, no API cost).
+  - `openai` — a real **cloud** model via the OpenAI API (set `OPENAI_API_KEY`).
   - `mock` — a deterministic stand-in that needs no model; it exercises the full app flow
     but produces placeholder findings, **not** a real review.
-  - `openai` — documented but **not implemented in this version**; selecting it fails with a
-    clear error. (A cloud adapter is future work.)
 - `OLLAMA_BASE_URL`, `OLLAMA_MODEL` — local model. Install Ollama and pull a code model,
   e.g. `ollama pull qwen2.5-coder:7b` (any local tag works; set `OLLAMA_MODEL` to match).
+- `OPENAI_API_KEY`, `OPENAI_MODEL` — for the OpenAI provider. The key is read **only** from the
+  environment / the gitignored `.env`, never hardcoded. `OPENAI_MODEL` defaults to `gpt-5-mini`;
+  `OPENAI_REASONING_EFFORT` (minimal|low|medium|high) and `OPENAI_MAX_OUTPUT_TOKENS` are optional
+  (we don't send `temperature` — gpt-5 reasoning models ignore it).
 - `DATABASE_URL` — SQLite file path.
+
+**Three ways to run the reviewer:** `mock` (no key, no model — easiest for a quick look),
+`ollama` (real local model, no cloud account), or `openai` (real cloud model, needs an API key).
 
 > No Ollama installed? Set `LLM_PROVIDER=mock` to run the app end-to-end with deterministic
 > placeholder findings. Real AI review requires a local model via Ollama.
