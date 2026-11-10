@@ -11,9 +11,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # LLM provider selection (Ollama-first).
-    llm_provider: str = "ollama"  # "ollama" | "openai"
+    llm_provider: str = "ollama"  # "ollama" | "openai" | "mock"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5-coder:7b"
+    ollama_timeout: float = 120.0  # seconds; raise for slow local models / large snippets.
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
 

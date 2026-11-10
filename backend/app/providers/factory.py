@@ -20,7 +20,11 @@ def get_provider(settings: Settings | None = None) -> ReviewProvider:
     provider = cfg.llm_provider
 
     if provider == "ollama":
-        return OllamaProvider(base_url=cfg.ollama_base_url, model=cfg.ollama_model)
+        return OllamaProvider(
+            base_url=cfg.ollama_base_url,
+            model=cfg.ollama_model,
+            timeout=cfg.ollama_timeout,
+        )
     if provider == "mock":
         return MockProvider()
     if provider == "openai":

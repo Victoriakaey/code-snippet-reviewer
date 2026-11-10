@@ -20,10 +20,19 @@ from .base import ProviderError, ReviewProvider
 class OllamaProvider(ReviewProvider):
     name = "ollama"
 
-    def __init__(self, base_url: str, model: str, timeout: float = 120.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        timeout: float = 120.0,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model_name = model
         self.timeout = timeout
+        # Optional transport injection — lets tests drive the error branches with
+        # httpx.MockTransport without a live server. Production leaves it None.
+        self._transport = transport
 
     async def review(self, *, code: str, language: str) -> str:
         payload = {
@@ -38,7 +47,9 @@ class OllamaProvider(ReviewProvider):
             "options": {"temperature": 0},
         }
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout, transport=self._transport
+            ) as client:
                 response = await client.post(f"{self.base_url}/api/chat", json=payload)
         except httpx.TimeoutException as exc:
             raise ProviderError(f"Ollama request timed out after {self.timeout}s") from exc
