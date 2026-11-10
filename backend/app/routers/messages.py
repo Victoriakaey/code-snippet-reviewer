@@ -105,11 +105,35 @@ async def post_message(
             },
         )
 
-    # Atomic: persist the user question + the assistant answer together. A persistence
-    # failure here is also a retryable condition — roll back (so no half thread is saved) and
-    # return the same 503, rather than a bare 500.
+    # The model call above was awaited WITHOUT a lock, so a new review may have been created
+    # meanwhile — turning this finding historical. The entry check (line above) ran before the
+    # call and cannot see that. Re-validate atomically before persisting (TOCTOU guard, D4):
+    #   1. drop the pre-call read snapshot so the re-check sees the freshest committed state;
+    #   2. flush the user row — this takes SQLite's single-writer lock, so from here no other
+    #      writer (a competing enqueue) can commit until we commit or roll back;
+    #   3. re-check that the finding is still on the latest review. If a newer review already
+    #      committed, it is visible now → roll back (so NOTHING is saved) and return the same
+    #      409 a historical finding gets. If not, the write lock guarantees any newer review
+    #      can only commit AFTER ours, so persisting the pair here is a valid serialization.
+    # A genuine persistence failure stays retryable (roll back, 503) rather than a bare 500.
+    guard_review_id = finding.review_id
     try:
+        db.rollback()
         db.add(FindingMessage(finding_id=finding_id, role="user", content=payload.question))
+        db.flush()  # acquire the write lock before the re-check
+        current = db.get(Review, guard_review_id)
+        if current is None or not _is_latest_review(db, current):
+            db.rollback()  # a newer review won the race — save nothing
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "error": {
+                        "code": "finding_read_only",
+                        "message": "This finding belongs to a historical review and cannot be discussed.",
+                        "review_id": guard_review_id,
+                    }
+                },
+            )
         db.add(
             FindingMessage(
                 finding_id=finding_id,

@@ -128,3 +128,45 @@ def test_unknown_finding_404(client: TestClient, monkeypatch):
     monkeypatch.setattr(settings, "llm_provider", "mock")
     assert client.post("/api/findings/nope/messages", json={"question": "hi"}).status_code == 404
     assert client.get("/api/findings/nope/messages").status_code == 404
+
+
+def test_discuss_rejects_review_created_during_model_call(
+    client: TestClient, session_factory, monkeypatch
+):
+    """TOCTOU regression (D4): a discuss request passes the is-latest check, then a NEW review
+    is created for the same snippet WHILE the model is generating. The answer must NOT be
+    committed onto the now-historical finding — expect 409 and nothing persisted.
+
+    Deterministic: the faked provider creates the competing review synchronously, in its own
+    committed transaction, before returning — no sleeps / timing.
+    """
+    fid = _seed(session_factory)  # finding on the latest (run #1 completed) review
+    s = session_factory()
+    try:
+        fin = s.get(Finding, fid)
+        snippet_id = s.get(Review, fin.review_id).snippet_id
+    finally:
+        s.close()
+
+    class RacingProvider:
+        name = "mock"
+        model_name = "mock-deterministic"
+
+        async def discuss(self, **_kw):
+            # Simulate a concurrent "Run review" landing during the model call.
+            s2 = session_factory()
+            try:
+                s2.add(Review(snippet_id=snippet_id, run_number=2, status="completed"))
+                s2.commit()
+            finally:
+                s2.close()
+            return "here is the answer"
+
+    monkeypatch.setattr(
+        "app.routers.messages.get_provider", lambda _s=None: RacingProvider()
+    )
+    res = client.post(f"/api/findings/{fid}/messages", json={"question": "explain"})
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "finding_read_only"
+    # Neither the user question nor the assistant answer may be persisted.
+    assert client.get(f"/api/findings/{fid}/messages").json() == []
