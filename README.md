@@ -5,9 +5,9 @@ Submit a snippet, trigger an LLM review, and work through the structured finding
 accept, dismiss, or discuss each one.
 
 > **Status:** data model + snippet CRUD (M1) + LLM review provider & validation pipeline
-> (M2). The async review worker, finding resolution, and the UI land in later milestones.
-> The commands below start the current backend (snippet create/list/get + health) and the
-> frontend skeleton.
+> (M2) + async review worker (M3). Finding resolution, discuss, and the UI land in later
+> milestones. The backend can now create a snippet, trigger a review, and poll it to
+> completion end-to-end.
 
 ## Stack
 
@@ -84,7 +84,17 @@ finding is semantically correct.
   failures (empty title/code, unsupported language, oversized input) → `422`.
 - `GET /api/snippets` — list snippets, newest first, each with a derived status.
 - `GET /api/snippets/{id}` — one snippet, or `404`.
+- `POST /api/snippets/{id}/reviews` — trigger a review → `202` + a `queued` review. `409`
+  (with the active review's id) if one is already in progress; `404` if the snippet is gone.
+- `GET /api/reviews/{id}` — poll a review: `queued` / `running` / `completed` (with findings)
+  / `failed` (with a sanitized error). Provenance (provider, model, rubric/prompt version) is
+  stored per review.
 - `GET /api/health` — liveness only.
+
+Reviews run on a single in-process background worker (one at a time per the local-model
+assumption). It is designed for a **single API process** — running multiple workers would
+break startup crash-recovery. A review interrupted by a restart is marked `failed` on the
+next start; `queued` reviews are preserved.
 
 Supported languages: Python, JavaScript, TypeScript, Java, Go. Limits: title ≤ 200 chars,
 code ≤ 50,000 chars.
