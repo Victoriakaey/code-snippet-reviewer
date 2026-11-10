@@ -230,6 +230,15 @@ def test_historical_read_only_even_when_latest_failed(client: TestClient, sessio
     assert res.status_code == 409
 
 
+def test_historical_read_only_when_newer_review_still_queued(client: TestClient, session_factory):
+    # A finding goes read-only the moment a NEWER run exists, even if it hasn't completed yet.
+    old_fid, latest, _rid = _seed_historical(session_factory, latest_status="queued")
+    assert latest is None
+    res = _patch(client, old_fid, {"resolution_status": "accepted"})
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "finding_read_only"
+
+
 # --- Visible through GET /api/reviews/{id} --------------------------------------
 
 
