@@ -171,22 +171,35 @@ export function SnippetDetail() {
       />
 
       {runs.length > 1 && (
-        <div className="run-selector" style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <label htmlFor="run-select" className="muted" style={{ fontSize: 13 }}>Review run</label>
-          <select
-            id="run-select"
-            value={selectedRunId ?? latestRunId ?? ""}
-            onChange={(e) => onSelectRun(e.target.value)}
-          >
-            {runs.map((r) => (
-              <option key={r.id} value={r.id}>
-                Review #{r.run_number} · {r.status}
-                {r.id === latestRunId ? " · latest" : ""} ({r.finding_count} finding{r.finding_count === 1 ? "" : "s"})
-              </option>
-            ))}
-          </select>
+        <div className="run-history" style={{ marginTop: 10 }}>
+          <div className="run-history-head">
+            <span className="muted" style={{ fontSize: 13 }}>Review history</span>
+            <span className="muted" style={{ fontSize: 12 }}>{runs.length} runs</span>
+          </div>
+          {/* A scrollable row of native-button pills — many runs scroll horizontally rather than
+              wrapping or overflowing the page. The latest/selected/failed runs are visually
+              distinct; selection uses aria-pressed, focus is keyboard-visible. */}
+          <div className="run-pills" role="group" aria-label="Review runs">
+            {runs.map((r) => {
+              const current = r.id === (selectedRunId ?? latestRunId);
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  className={`run-pill${current ? " current" : ""}${r.status === "failed" ? " failed" : ""}`}
+                  aria-pressed={current}
+                  onClick={() => onSelectRun(r.id)}
+                  title={`Review #${r.run_number} · ${r.status} · ${r.finding_count} finding${r.finding_count === 1 ? "" : "s"}`}
+                >
+                  <span className="run-pill-n">#{r.run_number}</span>
+                  {r.id === latestRunId && <span className="run-pill-tag latest">latest</span>}
+                  {r.status === "failed" && <span className="run-pill-tag failed">failed</span>}
+                </button>
+              );
+            })}
+          </div>
           {selectedReview && (
-            <span className="muted" style={{ fontSize: 13 }}>Viewing a historical run — read-only.</span>
+            <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>Viewing a historical run — read-only.</div>
           )}
         </div>
       )}

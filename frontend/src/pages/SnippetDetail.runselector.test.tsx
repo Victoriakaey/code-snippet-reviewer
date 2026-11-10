@@ -71,24 +71,29 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("SnippetDetail review-run selector", () => {
-  it("defaults to the latest run (editable), and shows the selector when >1 run exists", async () => {
+  it("defaults to the latest run (editable), and shows a run pill per run when >1 run exists", async () => {
     renderDetail();
     await waitFor(() => expect(screen.getByText("Latest finding")).toBeInTheDocument());
-    expect(screen.getByLabelText("Review run")).toBeInTheDocument();
+    // One pill button per run; the latest one is marked current (aria-pressed).
+    const latestPill = screen.getByRole("button", { name: /#2/ });
+    expect(latestPill).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /#1/ })).toBeInTheDocument();
     expect(screen.queryByText(/historical run — read-only/i)).toBeNull();
   });
 
-  it("selecting an older run loads it read-only and shows that run's findings", async () => {
+  it("selecting an older run pill loads it read-only and shows that run's findings", async () => {
     renderDetail();
     await waitFor(() => expect(screen.getByText("Latest finding")).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText("Review run"), { target: { value: "r1" } });
+    fireEvent.click(screen.getByRole("button", { name: /#1/ }));
 
     await waitFor(() => expect(mockGetReview).toHaveBeenCalledWith("r1"));
     await waitFor(() => expect(screen.getByText("Old finding")).toBeInTheDocument());
-    // The older run's findings replace the latest ones, and the read-only note is shown.
+    // The older run's findings replace the latest ones, the read-only note shows, and its pill
+    // becomes the current (pressed) one.
     expect(screen.queryByText("Latest finding")).toBeNull();
     expect(screen.getByText(/historical run — read-only/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /#1/ })).toHaveAttribute("aria-pressed", "true");
 
     // Expanding the historical finding offers "View discussion" (read-only), not resolve controls.
     fireEvent.click(screen.getByText("Old finding"));
@@ -96,13 +101,13 @@ describe("SnippetDetail review-run selector", () => {
     expect(screen.queryByText(/^Accept$/)).toBeNull();
   });
 
-  it("switching back to the latest run restores the default (editable) view", async () => {
+  it("clicking the latest run pill restores the default (editable) view", async () => {
     renderDetail();
     await waitFor(() => expect(screen.getByText("Latest finding")).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText("Review run"), { target: { value: "r1" } });
+    fireEvent.click(screen.getByRole("button", { name: /#1/ }));
     await waitFor(() => expect(screen.getByText("Old finding")).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText("Review run"), { target: { value: "r2" } });
+    fireEvent.click(screen.getByRole("button", { name: /#2/ }));
     await waitFor(() => expect(screen.getByText("Latest finding")).toBeInTheDocument());
     expect(screen.queryByText("Old finding")).toBeNull();
     expect(screen.queryByText(/historical run — read-only/i)).toBeNull();
