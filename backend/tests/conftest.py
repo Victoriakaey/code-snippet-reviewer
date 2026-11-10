@@ -8,6 +8,7 @@ assertions see one consistent store.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,9 +27,11 @@ def engine(tmp_path) -> Iterator[Engine]:
     eng = create_engine(url, connect_args={"check_same_thread": False})
 
     @event.listens_for(eng, "connect")
-    def _fk_on(dbapi_connection, _record):  # noqa: ANN001
+    def _pragmas(dbapi_connection, _record):  # noqa: ANN001
         cur = dbapi_connection.cursor()
         cur.execute("PRAGMA foreign_keys=ON")
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA busy_timeout=5000")
         cur.close()
 
     Base.metadata.create_all(eng)
@@ -65,3 +68,24 @@ def client(session_factory: sessionmaker) -> Iterator[TestClient]:
         yield TestClient(app)
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def worker_scope(session_factory: sessionmaker, monkeypatch):
+    """Point the worker's transaction scope at the test database (it otherwise uses the real
+    engine). Returns the scope so tests can also seed/inspect rows through it."""
+
+    @contextmanager
+    def scope() -> Iterator[Session]:
+        s = session_factory()
+        try:
+            yield s
+            s.commit()
+        except Exception:
+            s.rollback()
+            raise
+        finally:
+            s.close()
+
+    monkeypatch.setattr("app.worker._session_scope", scope)
+    return scope
